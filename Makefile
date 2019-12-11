@@ -1,18 +1,28 @@
+TARGET = bin/cid
+LIBS = -lm -lncurses
 CC = gcc
-CCFLAGS = -Wall
+CFLAGS = -g -Wall
 
-BINDIR = bin
-BINNAME = $(BINDIR)/cid
-OBJECTS = $(shell ls -1 | grep .*.c | cut -d'.' -f 1 | sed 's/$$/.o/g')
+.PHONY: default all clean
 
-$(BINDIR):
-	mkdir $(BINDIR)
+default: $(TARGET)
+all: default
 
-$(BINNAME): $(OBJECTS) $(BINDIR)
-	$(CC) -o $(BINNAME) $(OBJECTS)
+OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
+HEADERS = $(wildcard *.h)
 
-run: $(BINNAME)
-	./$(BINNAME)
+%.o: %.c $(HEADERS)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+.PRECIOUS: $(TARGET) $(OBJECTS)
+
+bin:
+	mkdir bin
+
+$(TARGET): bin $(OBJECTS)
+	$(CC) $(OBJECTS) -Wall $(LIBS) -o $@
 
 clean:
-	rm -rf $(OBJECTS) $(BINDIR)
+	rm -f *.o
+	rm -f $(TARGET)
+	rm -rf bin

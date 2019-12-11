@@ -1,15 +1,20 @@
+#ifndef SONG_H
+#define SONG_H
+
 #define MAX_VOICES 8
 #define MAX_SONG_LENGTH 512
 #define EMPTY 0
 
-void init_song(int bpm);
+typedef struct {
+    int length;
+    int bpm;
+    int bars[MAX_SONG_LENGTH][MAX_VOICES];
+} Song;
 
-int get_song_length();
+Song song_init(int bpm);
 
-void set_bpm(int bpm);
+int song_set_pattern(Song * song, int nbar, int nvoice, int pattern);
 
-int get_bpm();
+int song_get_pattern(Song const * song, int nbar, int nvoice);
 
-int set_song_pattern(int nbar, int nvoice, int pattern);
-
-int get_song_pattern(int nbar, int nvoice);
+#endif // SONG_H

@@ -19,23 +19,24 @@
 Defautl template
 
 Instruments:
-    00 kick
-    01 snare
-    02 c_hat
-    03 o_hat
+    00 kick         - Kick drum
+    01 snare        - Snare drum
+    02 c_hat        - Closed high-hat
+    03 o_hat        - Open high-hat
 
-    10 lead
-    11 l_pluck
-    12 s_pluck
-    13 pad
-    14 sin_voice
+    10 lead         - Lead synth voice
+    11 s_pluck      - Short plucky synth
+    12 l_pluck      - Long plucky synth
+    13 pad          - Pad synth
+    14 sin_voice    - Synth almost sin wave
+    15 synth_drop   - Resonant synth drop
 
-    20 sub_bass
-    21 saw_bass
-    22 pluck_bass
+    20 sub_bass     - Low bass close to sin wave
+    21 saw_bass     - Classic bass based on the saw
+    22 pluck_bass   - Plucky bass synth
 
-    30 noize_up
-    31 noize_down
+    30 noize_up     - Long noisy build-up
+    31 noize_down   - Long noisy drop
 
 Arpegios
     01 fast_up
