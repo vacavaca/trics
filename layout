@@ -1,0 +1,187 @@
+ hjkl or arrow keys                       - move cursor
+ CTRL + hl or arrow keys or mouse click   - switch tab
+ ALT + hl or arrow keys or mouse click    - switch sub tab
+ SPACE or mouse click                     - edit mode
+ CTRL + SPACE                             - play from selection or stop
+ CTRL + r                                 - start / stop recording (in pattern tab)
+ y                                        - copy bar/pattern/table row
+ p                                        - paste bar/pattern/table row
+ s                                        - save song
+ q-i,2,3,5-7,z-',',s-d,g-j                - notes
+
+ In edit mode:
+ jk or arrow keys or mouse grab           - move parameter one step up/down
+ CTRL + jk or arrow keys                  - move parameter octave / 12 steps up/down
+ ALT + jk or arrow keys                   - double/half parameter
+ ENTER or ESC                             - exit from edit mode (where no auto exit)
+
+
+Defautl template
+
+Instruments:
+    00 kick
+    01 snare
+    02 c_hat
+    03 o_hat
+
+    10 lead
+    11 l_pluck
+    12 s_pluck
+    13 pad
+    14 sin_voice
+
+    20 sub_bass
+    21 saw_bass
+    22 pluck_bass
+
+    30 noize_up
+    31 noize_down
+
+Arpegios
+    01 fast_up
+    02 fast_down
+    03 major_up
+    04 major_down
+    03 major_alt
+    03 minor_up
+    04 minor_down
+    03 minor_alt
+
+
+
+
+
+
+
+ *SONG  PATT  INST  ARP
+  -----------------------
+
+  bp st title
+  80 20 Song Title lo....
+
+  00 -- 03 01 -- 03 ff r4
+  00 -- 03 01 -- 03 ff r4
+  00 -- 03 01 -- 03 ff r4
+  00 -- 03 01 -- 03 ff r4
+  00 -- 03 01 -- 03 ff r4
+  00 -- 03 01 -- 03 ff r4
+  01 43 -- -- -- -- -- --
+> 01 43 -- -- -- -- -- --
+  ...    song_title_lo...
+
+
+
+
+
+
+
+
+  SONG *PATT  INST  ARP
+  -----------------------
+
+  ## o1 o2
+  00 04 04
+
+  in nt   ar   in nt   ar
+  00 C#-1 --   -- ---- --
+  00 C#-1 --   -- ---- --
+  00 C#-1 --   -- ---- --
+  00 C#   --   -- ---- --
+  00 ==== --   -- ---- --
+  00 C#   --   -- ---- --
+  00 C#   --   -- ---- --
+  00 C#   --   -- ---- --
+  ...    song_title_lo...
+
+
+
+
+
+
+  SONG  PATT *INST  ARP
+ *MAIN  WAVE  FILT
+  -----------------------
+
+  ## name
+  00 Lead synth
+
+  vl vc dt wd hr
+  ff 04 03 00 01
+
+  aa ad as ar ds da dr rv
+  00 00 00 00 00 00 00 00
+
+
+
+  ...    song_title_lo...
+
+
+
+
+
+
+
+
+
+
+  SONG  PATT *INST  ARP
+  MAIN *WAVE  FILT
+  -----------------------
+
+  wv rm hs    pw    rp st
+  00 00 01  + 00    00 10
+  00 00 01  + 00
+  00 00 01  + 00
+  00 00 01  + 00
+  00 00 01  + 00
+  00 00 01  + 00
+  00 00 01  + 00
+  00 00 01  + 00
+  ...    song_title_lo...
+
+
+
+
+
+
+  SONG  PATT *INST  ARP
+  MAIN  WAVE *FILT
+  -----------------------
+
+  tp    rs    ct    rp st
+  00  + 01  + 00    00 10
+  00  + 01  + 00
+  00  + 01  + 00
+  00  + 01  + 00
+  00  + 01  + 00
+  00  + 01  + 00
+  00  + 01  + 00
+  00  + 01  + 00
+  ...    song_title_lo...
+
+
+
+
+
+
+  SONG  PATT  INST *ARP
+  -----------------------
+
+  ## name
+  00 Major third up
+
+     ct    rp st
+   + 00    01 10
+   + 00
+   + 00
+   + 00
+   + 00
+   + 00
+   + 00
+   + 00
+  ...    song_title_lo...
+
+
+
+
+
