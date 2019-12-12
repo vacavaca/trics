@@ -1,3 +1,9 @@
+# Trics
+
+Mighty tiny text-based chiptune tracker
+
+## Keyboard layout
+
  hjkl or arrow keys                       - move cursor
  CTRL + hl or arrow keys or mouse click   - switch tab
  ALT + hl or arrow keys or mouse click    - switch sub tab
@@ -16,7 +22,7 @@
  ENTER or ESC                             - exit from edit mode (where no auto exit)
 
 
-Defautl template
+## Defautl template
 
 Instruments:
     00 kick         - Kick drum
@@ -38,7 +44,7 @@ Instruments:
     30 noize_up     - Long noisy build-up
     31 noize_down   - Long noisy drop
 
-Arpegios
+Arpeggios
     01 fast_up
     02 fast_down
     03 major_up
@@ -55,7 +61,6 @@ Arpegios
 
 
  *SONG  PATT  INST  ARP
-  -----------------------
 
   bp st title
   80 20 Song Title lo....
@@ -78,7 +83,6 @@ Arpegios
 
 
   SONG *PATT  INST  ARP
-  -----------------------
 
   ## o1 o2
   00 04 04
@@ -101,13 +105,12 @@ Arpegios
 
   SONG  PATT *INST  ARP
  *MAIN  WAVE  FILT
-  -----------------------
 
   ## name
   00 Lead synth
 
-  vl vc dt wd hr
-  ff 04 03 00 01
+  vl hr
+  ff 01
 
   aa ad as ar ds da dr rv
   00 00 00 00 00 00 00 00
@@ -127,7 +130,6 @@ Arpegios
 
   SONG  PATT *INST  ARP
   MAIN *WAVE  FILT
-  -----------------------
 
   wv rm hs    pw    rp st
   00 00 01  + 00    00 10
@@ -147,7 +149,6 @@ Arpegios
 
   SONG  PATT *INST  ARP
   MAIN  WAVE *FILT
-  -----------------------
 
   tp    rs    ct    rp st
   00  + 01  + 00    00 10
@@ -166,12 +167,11 @@ Arpegios
 
 
   SONG  PATT  INST *ARP
-  -----------------------
 
   ## name
   00 Major third up
 
-     ct    rp st
+     pt    rp st
    + 00    01 10
    + 00
    + 00
