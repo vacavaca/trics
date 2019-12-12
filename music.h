@@ -19,6 +19,8 @@
 #define EMPTY 0
 #define NONE -1
 
+_Static_assert(sizeof(int) == 4, "Never gonna give you up");
+
 typedef enum {
     OPERATOR_EQ = '=',
     OPERATOR_ADD = '+',

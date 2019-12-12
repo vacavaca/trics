@@ -1,25 +1,43 @@
 # Trics
 
+```
+ ____  ____  ____  ___  ____
+(_  _)(  _ \(_  _)/ __)/ _ _)
+  )(   )   / _)(_( (__ \__  \
+ (__) (_)\_)(____)\___)(____/
+
+```
+
 Mighty tiny text-based chiptune tracker
 
 ## Keyboard layout
 
+### Default mode
+
  hjkl or arrow keys                       - move cursor
  CTRL + hl or arrow keys or mouse click   - switch tab
  ALT + hl or arrow keys or mouse click    - switch sub tab
+ CTRL + jk or arrow keys                  - move cursor one screen up/down
+ ALT + jk or arrow keys                   - move cursor to the first/last row
  SPACE or mouse click                     - edit mode
  CTRL + SPACE                             - play from selection or stop
- CTRL + r                                 - start / stop recording (in pattern tab)
+ CTRL + r                                 - start / stop recording (in pattern tab, with focus in track)
  y                                        - copy bar/pattern/table row
  p                                        - paste bar/pattern/table row
  s                                        - save song
- q-i,2,3,5-7,z-',',s-d,g-j                - notes
+ zsxdcvgbhnjmq2w3er5t6y7ui                - notes
 
- In edit mode:
+### Edit mode
+
  jk or arrow keys or mouse grab           - move parameter one step up/down
  CTRL + jk or arrow keys                  - move parameter octave / 12 steps up/down
  ALT + jk or arrow keys                   - double/half parameter
- ENTER or ESC                             - exit from edit mode (where no auto exit)
+ ENTER                                    - exit from edit mode saving changes (where no auto exit)
+ ESC or SPACE                             - exit from edit mode discarding changes (where no auto exit)
+
+### Recording mode
+ zsxdcvgbhnjmq2w3er5t6y7ui                - notes
+
 
 
 ## Defautl template
@@ -37,7 +55,7 @@ Instruments:
     14 sin_voice    - Synth almost sin wave
     15 synth_drop   - Resonant synth drop
 
-    20 sub_bass     - Low bass close to sin wave
+    20 bass         - Classic bass close to sin wave with punchy attack
     21 saw_bass     - Classic bass based on the saw
     22 pluck_bass   - Plucky bass synth
 
@@ -49,10 +67,11 @@ Arpeggios
     02 fast_down
     03 major_up
     04 major_down
-    03 major_alt
-    03 minor_up
-    04 minor_down
-    03 minor_alt
+    05 major_alt
+    06 minor_up
+    07 minor_down
+    08 minor_alt
+    09 power_alt
 
 
 
@@ -60,6 +79,7 @@ Arpeggios
 
 
 
+```
  *SONG  PATT  INST  ARP
 
   bp st title
@@ -74,14 +94,14 @@ Arpeggios
   01 43 -- -- -- -- -- --
 > 01 43 -- -- -- -- -- --
   ...    song_title_lo...
+```
 
 
 
 
 
 
-
-
+```
   SONG *PATT  INST  ARP
 
   ## o1 o2
@@ -90,19 +110,19 @@ Arpeggios
   in nt   ar   in nt   ar
   00 C#-1 --   -- ---- --
   00 C#-1 --   -- ---- --
-  00 C#-1 --   -- ---- --
+> 00 C#-1 --   -- ---- --
   00 C#   --   -- ---- --
   00 ==== --   -- ---- --
   00 C#   --   -- ---- --
   00 C#   --   -- ---- --
   00 C#   --   -- ---- --
   ...    song_title_lo...
+```
 
 
 
 
-
-
+```
   SONG  PATT *INST  ARP
  *MAIN  WAVE  FILT
 
@@ -118,6 +138,7 @@ Arpeggios
 
 
   ...    song_title_lo...
+```
 
 
 
@@ -126,8 +147,7 @@ Arpeggios
 
 
 
-
-
+```
   SONG  PATT *INST  ARP
   MAIN *WAVE  FILT
 
@@ -141,12 +161,12 @@ Arpeggios
   00 00 01  + 00
   00 00 01  + 00
   ...    song_title_lo...
+```
 
 
 
 
-
-
+```
   SONG  PATT *INST  ARP
   MAIN  WAVE *FILT
 
@@ -160,12 +180,13 @@ Arpeggios
   00  + 01  + 00
   00  + 01  + 00
   ...    song_title_lo...
+```
 
 
 
 
 
-
+```
   SONG  PATT  INST *ARP
 
   ## name
@@ -181,6 +202,10 @@ Arpeggios
    + 00
    + 00
   ...    song_title_lo...
+
+```
+
+
 
 
 

@@ -15,11 +15,49 @@ void resizeHandler(int sig) {
     winsertln(win);
 }
 
+#define BLOCK_SIZE 17
+
 int main(int argc, char *argv[]) {
 
     struct pollfd fd = {
         .fd = 0,
         .events = POLLIN};
+
+    char *buff = NULL;
+    bool print = false;
+    size_t len = 0;
+    while(1) {
+        if (POLLIN == poll(&fd, 1, 0)) {
+            char tmp[BLOCK_SIZE];
+            size_t read_size = read(0, tmp, BLOCK_SIZE - 1);
+            tmp[BLOCK_SIZE - 1] = 0;
+
+            len += read_size / sizeof(char);
+            if (buff == NULL) {
+                buff = malloc(sizeof(char) * (read_size + 1));
+                buff[0] = 0;
+            } else {
+                buff = realloc(buff, sizeof(char) * (len + 1));
+            }
+            strcat(buff, tmp);
+            buff[len] = 0;
+            if (read_size < BLOCK_SIZE - 1) {
+                print = true;
+            } else {
+                print = false;
+            }
+        }
+ 
+        if (print) {
+            printf("print %d\n", len);
+            print = false;
+            printf(buff);
+            free(buff);
+            len = 0;
+            buff = NULL;
+        }
+    }
+    return 0;
     int i = 0;
     int cap = 10;
     while (1) {
