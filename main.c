@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <termios.h>
 #include <unistd.h>
 
 static WINDOW *win;
@@ -26,6 +27,10 @@ int main(int argc, char *argv[]) {
     char *buff = NULL;
     bool print = false;
     size_t len = 0;
+ struct termios raw;
+  tcgetattr(STDIN_FILENO, &raw);
+  raw.c_lflag &= ~(ECHO);
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
     while(1) {
         if (POLLIN == poll(&fd, 1, 0)) {
             char tmp[BLOCK_SIZE];
@@ -51,45 +56,16 @@ int main(int argc, char *argv[]) {
         if (print) {
             printf("print %d\n", len);
             print = false;
-            printf(buff);
+            printf("result: ");
+            for (int i = 0; i < len; i ++) {
+                printf("%d ", buff[i]);
+            }
+            printf("\n");
             free(buff);
             len = 0;
             buff = NULL;
         }
     }
-    return 0;
-    int i = 0;
-    int cap = 10;
-    while (1) {
-        if (POLLIN == poll(&fd, 1, 0)) {
-            size_t size = cap;
-            size_t offset = 0;
-            size_t total = 0;
-            printf("malloc: %d\n", cap);
-            char *buff = malloc(sizeof(char) * cap);
-            while (size >= cap) {
-                if (cap < offset + size) {
-                    printf("realloc: %d\n", cap + offset);
-                    realloc(buff, sizeof(char) * cap + offset * sizeof(char));
-                }
-                size = read(0, buff + offset * sizeof(char), cap);
-                total += size;
-                printf("read: %d\n", size);
-                offset += cap;
-            }
-            printf("total: %d\n", total);
-
-            char *realbuff = malloc(total);
-            memcpy(realbuff, buff, total);
-            printf("result: ");
-            printf(realbuff);
-            printf("\n");
-            free(buff);
-            buff = NULL;
-        }
-    }
-
-    return 0;
 
     Interface interface;
 
@@ -104,15 +80,13 @@ int main(int argc, char *argv[]) {
     noecho();
     keypad(stdscr, TRUE);
     curs_set(0);
-    timeout(8);
+    //timeout(8);
+    timeout(500);
     while (true) {
         int c = wgetch(win);
-        if (c == KEY_RIGHT | KEY_ENTER) {
-            interface_next_primary_tab(&interface);
-        }
-        if (c == KEY_LEFT | KEY_ENTER) {
-            interface_prev_primary_tab(&interface);
-        }
+
+        wmove(win, 0, 0);
+        wprintw(win, "%d\n", c);
         if (!interface_draw(win, &interface)) {
             endwin();
             fprintf(stderr, "Failed to draw interface\n");
