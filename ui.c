@@ -37,11 +37,15 @@ int control_table_init(int column_count, int x, int y, int width,
 
 int control_table_add(ControlTable *table, Control const *row) {
     if (table->length == table->capacity) {
-        table->capacity *= 2;
-        table->controls = realloc(table->controls, table->capacity);
-        if (table->controls == NULL) {
+        int next_cap = table->capacity * 2;
+        Control const **ex;
+        ex = realloc(table->controls, next_cap);
+        if (ex == NULL) {
             return 0;
         }
+
+        table->capacity = next_cap;
+        table->controls = ex;
     }
 
     table->controls[table->length] = row;
@@ -85,11 +89,15 @@ int interface_init(Interface *interface) {
 
 int interface_add_table(Interface *interface, ControlTable table) {
     if (interface->tables_count == interface->capacity) {
-        interface->capacity *= 2;
-        interface->tables = realloc(interface->tables, interface->capacity);
-        if (interface->tables == NULL) {
+        ControlTable const **ex;
+        int next_cap = interface->capacity * 2;
+        ex = realloc(interface->tables, next_cap);
+        if (ex == NULL) {
             return 0;
         }
+
+        interface->capacity = next_cap;
+        interface->tables = ex;
     }
 
     interface->tables[interface->tables_count] = table;
@@ -118,14 +126,6 @@ void interface_prev_primary_tab(Interface *interface) {
     interface->selected_tab = PRIMARY_TABS[i > 0 ? i - 1 : 0];
 }
 
-int interface_draw(WINDOW *win, Interface *interface) {
-    if (!draw_tabs(win, interface)) {
-        return 0;
-    }
-
-    return 1;
-}
-
 int draw_tabs(WINDOW *win, Interface *interface) {
     if (wmove(win, 1, 1) != OK) {
         return 0;
@@ -147,9 +147,9 @@ int draw_tabs(WINDOW *win, Interface *interface) {
         return 0;
     }
 
-    bool instrument_tab = interface->selected_tab == TAB_INSTRUMENT ||
-                          interface->selected_tab == TAB_WAVE ||
-                          interface->selected_tab == TAB_FILTER;
+    const bool instrument_tab = interface->selected_tab == TAB_INSTRUMENT ||
+                                interface->selected_tab == TAB_WAVE ||
+                                interface->selected_tab == TAB_FILTER;
     if (wprintw(win, instrument_tab ? "*INST" : " INST") != OK) {
         return 0;
     }
@@ -159,6 +159,14 @@ int draw_tabs(WINDOW *win, Interface *interface) {
     }
 
     if (wprintw(win, interface->selected_tab == TAB_ARPEGGIO ? "*ARP" : " ARP") != OK) {
+        return 0;
+    }
+
+    return 1;
+}
+
+int interface_draw(WINDOW *win, Interface *interface) {
+    if (!draw_tabs(win, interface)) {
         return 0;
     }
 

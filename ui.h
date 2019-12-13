@@ -1,11 +1,10 @@
 #ifndef UI_H
 #define UI_H
 
-#include <assert.h>
-#include <ncurses.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <assert.h>  // assert
+#include <ncurses.h> // wmove wprintw
+#include <stdbool.h> // bool
+#include <stdlib.h> // malloc
 
 #define DEFAULT_VEC_CAPACITY 64
 #define MAX_TABLE_WIDTH 8

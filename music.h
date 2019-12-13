@@ -1,7 +1,7 @@
 #ifndef MUSIC_H
 #define MUSIC_H
 
-#include <stdbool.h>
+#include <stdbool.h> // bool
 
 #define MAX_WAVE_STEPS 16
 #define MIN_WAVE_STEP 4

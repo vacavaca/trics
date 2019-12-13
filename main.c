@@ -1,72 +1,57 @@
+#include "input.h"
 #include "music.h"
 #include "ui.h"
-#include <ncurses.h>
-#include <poll.h>
-#include <signal.h>
-#include <stdio.h>
-#include <string.h>
-#include <termios.h>
-#include <unistd.h>
+#include <ncurses.h> // ncurses functions
+#include <signal.h>  // signal
+#include <termios.h> // TC constants
+#include <time.h>    // nanosleep
+#include <unistd.h>  // STDIN_FILENO
 
 static WINDOW *win;
 
-void resizeHandler(int sig) {
+struct termios orig_termios;
+
+void enable_raw_mode(void) {
+    tcgetattr(STDIN_FILENO, &orig_termios);
+    struct termios raw = orig_termios;
+    raw.c_lflag &= ~(ECHO | ICANON | ISIG);
+    raw.c_lflag &= ~(ECHO);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
+
+void disable_raw_mode(void) {
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+
+void enable_mouse_tracking(void) {
+    printf("\x1B[?1000h");
+}
+
+void disable_mouse_tracking(void) {
+    printf("\x1B[?1000l");
+}
+
+void handle_resize(int sig) {
     endwin();
     wclear(win);
     winsertln(win);
 }
 
-#define BLOCK_SIZE 17
+void handle_exit(void) {
+    disable_raw_mode();
+    endwin();
+    disable_mouse_tracking();
+}
+
+void sleep_msec(int ms) {
+    struct timespec ts;
+    ts.tv_sec = ms / 1000;
+    ts.tv_nsec = (ms % 1000) * 1000000;
+    struct timespec r;
+    nanosleep(&ts, &r);
+}
 
 int main(int argc, char *argv[]) {
-
-    struct pollfd fd = {
-        .fd = 0,
-        .events = POLLIN};
-
-    char *buff = NULL;
-    bool print = false;
-    size_t len = 0;
- struct termios raw;
-  tcgetattr(STDIN_FILENO, &raw);
-  raw.c_lflag &= ~(ECHO);
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-    while(1) {
-        if (POLLIN == poll(&fd, 1, 0)) {
-            char tmp[BLOCK_SIZE];
-            size_t read_size = read(0, tmp, BLOCK_SIZE - 1);
-            tmp[BLOCK_SIZE - 1] = 0;
-
-            len += read_size / sizeof(char);
-            if (buff == NULL) {
-                buff = malloc(sizeof(char) * (read_size + 1));
-                buff[0] = 0;
-            } else {
-                buff = realloc(buff, sizeof(char) * (len + 1));
-            }
-            strcat(buff, tmp);
-            buff[len] = 0;
-            if (read_size < BLOCK_SIZE - 1) {
-                print = true;
-            } else {
-                print = false;
-            }
-        }
- 
-        if (print) {
-            printf("print %d\n", len);
-            print = false;
-            printf("result: ");
-            for (int i = 0; i < len; i ++) {
-                printf("%d ", buff[i]);
-            }
-            printf("\n");
-            free(buff);
-            len = 0;
-            buff = NULL;
-        }
-    }
-
     Interface interface;
 
     if (!interface_init(&interface)) {
@@ -74,28 +59,52 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    win = initscr();
-    signal(SIGWINCH, resizeHandler);
-    cbreak();
-    noecho();
-    keypad(stdscr, TRUE);
-    curs_set(0);
-    //timeout(8);
-    timeout(500);
-    while (true) {
-        int c = wgetch(win);
+    atexit(handle_exit);
+    signal(SIGWINCH, handle_resize);
 
-        wmove(win, 0, 0);
-        wprintw(win, "%d\n", c);
+    enable_mouse_tracking();
+
+    win = initscr();
+    enable_raw_mode();
+    curs_set(0);
+    start_color();
+    init_pair(1, COLOR_YELLOW, COLOR_BLACK);
+
+    int last_write = 0;
+    int i = 0;
+    while (true) {
+        sleep_msec(8);
+
+        if (i - last_write > 48) {
+            wclear(win);
+        }
+
+        Input input;
+        if (input_read(&input)) {
+            if (input.type == INPUT_TYPE_KEY && !input.key.special && input.key.modifier == MODIFIER_KEY_CTRL && input.key.ch == 'c') {
+                return 0;
+            }
+
+            char *repr = input_repr(&input);
+            size_t repr_len = strlen(repr);
+            if (repr_len > 0) {
+                last_write = i;
+                wclear(win);
+            }
+            wmove(win, 15, 25 - repr_len);
+            attron(COLOR_PAIR(1));
+            wprintw(win, repr);
+            attroff(COLOR_PAIR(1));
+        }
+
         if (!interface_draw(win, &interface)) {
             endwin();
             fprintf(stderr, "Failed to draw interface\n");
             return 1;
         }
         wrefresh(win);
+        i += 1;
     }
-
-    endwin();
 
     return 0;
 }
