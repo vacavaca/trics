@@ -3,12 +3,6 @@
 </p>
 <p align="center">:video_game: :notes: __Mighty tiny text-based chiptune tracker__</p>
 
-
-
-## :sparkles: [How to use](doc/MANUAL)
-
 ![Screenshot](/doc/screenshot.png)
 
-
-
-
+## :sparkles: [How to use](doc/MANUAL)
