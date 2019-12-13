@@ -1,5 +1,5 @@
 <p align="center">
-	<ing	src="doc/logo.png" alt="Logo" />
+  <img src="https://i.ibb.co/5Y93XtX/logo.png" alt="logo">
 	<p><b>:video_game: :notes: Mighty tiny text-based chiptune tracker</b></p>
 </p>
 
