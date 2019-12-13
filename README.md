@@ -1,13 +1,13 @@
 <p align="center">
   <img src="https://i.ibb.co/5Y93XtX/logo.png" alt="logo">
 </p>
-<p align="center">:video_game: :notes: <b>Mighty tiny text-based chiptune tracker</b></p>
+<p align="center">:video_game: <b>Mighty tiny text-based chiptune tracker</b> :notes:</p>
 
 
 <p align="center">
 <a href="https://github.com/vacavaca/trics/blob/master/doc/MANUAL"> :sparkles: <b>How to use</b></a>&nbsp;&nbsp;
-<a href="https://github.com/vacavaca/trics/releases"><b>Download</b></a>&nbsp;&nbsp;
-<a href="https://github.com/vacavaca/trics/blob/master/doc/BUILD"><b>Build</b></a></p>
+<a href="https://github.com/vacavaca/trics/releases">:vhs: <b>Download</b></a>&nbsp;&nbsp;
+<a href="https://github.com/vacavaca/trics/blob/master/doc/BUILD">:space_invader: <b>Build</b></a></p>
 
 <p align="center">
 <img src="https://img.shields.io/static/v1?label=license&message=GPLv3&color=green">
