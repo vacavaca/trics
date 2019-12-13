@@ -5,7 +5,9 @@
 
 
 <p align="center">
-<a href="https://github.com/vacavaca/cid/blob/master/doc/MANUAL"> :sparkles: <b>How to use</b></a></p>
+<a href="https://github.com/vacavaca/trics/blob/master/doc/MANUAL"> :sparkles: <b>How to use</b></a></p>&nbsp;&nbsp;
+<a href="https://github.com/vacavaca/trics/releases"><b>Download</b></a></p>&nbsp;&nbsp;
+<a href="https://github.com/vacavaca/trics/blob/master/doc/BUILD"><b>Build</b></a></p>
 
 <p align="center">
 <img src="https://img.shields.io/static/v1?label=license&message=GPLv3&color=green">

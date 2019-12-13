@@ -1,4 +1,4 @@
-TARGET = bin/cid
+TARGET = bin/trics
 LIBS = -lm -lncurses
 CC = gcc
 CFLAGS = -g -Wall -Wextra -Wpedantic \
