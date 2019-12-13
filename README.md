@@ -3,7 +3,7 @@
 :video_game: :notes: __Mighty tiny text-based chiptune tracker__
 </p>
 
-	<p align="center">
+<p align="center">
 		<a href="https://github.com/vacavaca/cid/blob/master/doc/MANUAL"> :sparkles: __How to use__</a>
 	</p>
 ![Screenshot](/doc/screenshot.png)
