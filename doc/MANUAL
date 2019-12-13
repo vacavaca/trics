@@ -31,11 +31,12 @@ Edit mode
 
   jk or arrow keys 
   or mouse grab    		 - move parameter one step up/down
-  CTRL + jk or arrow keys        - move parameter octave / 12 steps up/down
+  CTRL + jk or arrow keys        - move parameter by octave 
+				   (12 steps up/down)
   ALT + jk or arrow keys         - double/half parameter
   ENTER                          - exit from edit mode saving changes 
  				   (where no auto exit)
-  ESC or SPACE                   - exit from edit mode discarding changes 
+  ESC or SPACE                   - exit from edit mode discarding changes
 				   (where no auto exit)
 
 
@@ -127,7 +128,8 @@ Arpeggios
   00 -- 03 01 -- 03 ff r4
   00 -- 03 01 -- 03 ff r4
   01 43 -- -- -- -- -- --
-> 01 43 -- -- -- -- -- --
+> 01 43 -- -- -- -- -- --To github.com:vacavaca/cid.git
+
   ...    song_title_lo...
 ```
 
