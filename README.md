@@ -4,6 +4,6 @@
 </p>
 
 <p align="center">
-		<a href="https://github.com/vacavaca/cid/blob/master/doc/MANUAL"> :sparkles: __How to use__</a>
+		<a href="https://github.com/vacavaca/cid/blob/master/doc/MANUAL"> :sparkles: <b>How to use</b></a>
 	</p>
 ![Screenshot](/doc/screenshot.png)
