@@ -4,106 +4,112 @@
  	 (__) (_)\_)(____)\___)(____/
 
 
-Mighty tiny text-based chiptune tracker
+    Mighty tiny text-based chiptune tracker                    
 
 
-## Keyboard layout
+	       Keyboard layout
 
-### Default mode
+Default mode
 
- hjkl or arrow                            - move cursor
- CTRL + hl or CTRL + arrow or mouse click - switch tab
- ALT + hl or ALT + arrow or mouse click   - switch sub tab
- CTRL + jk or CTRL + arrow                - move cursor one screen up/down
- ALT + jk or ALT + arrow                  - move cursor to the first/last row
- SPACE or mouse click                     - edit mode
- CTRL + SPACE                             - play from selection or stop
- CTRL + r                                 - start / stop recording (in pattern tab, with focus in track)
- y                                        - copy bar/pattern/table row
- p                                        - paste bar/pattern/table row
- s                                        - save song
+  hjkl or arrow                  - move cursor
+  CTRL + hl or CTRL + arrow	 - switch tab
+  or mouse click 
 
-### Edit mode
+  ALT + hl or ALT + arrow   	 - switch sub tab
+  or mouse click
+  CTRL + jk or CTRL + arrow      - move cursor one screen up/down
+  ALT + jk or ALT + arrow        - move cursor to the first/last row
+  SPACE or mouse click           - edit mode
+  CTRL + SPACE                   - play from selection or stop
+  CTRL + r                       - start / stop recording
+ 				  (in pattern tab, with focus in track)
+  y                              - copy bar/pattern/table row
+  p                              - paste bar/pattern/table row
+  s                              - save song
 
- jk or arrow keys or mouse grab           - move parameter one step up/down
- CTRL + jk or arrow keys                  - move parameter octave / 12 steps up/down
- ALT + jk or arrow keys                   - double/half parameter
- ENTER                                    - exit from edit mode saving changes (where no auto exit)
- ESC or SPACE                             - exit from edit mode discarding changes (where no auto exit)
+Edit mode
 
-### Notes
-
-```
-  _ _   _ _ _   _ _   _ _ _
- |s|d| |g|h|j| |2|3| |5|6|7|
- |_|_| |_|_|_| |_|_| |_|_|_| _
-|z|x|c|v|b|n|m|q|w|e|r|t|y|u|i|
-|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|
-
-```
+  jk or arrow keys 
+  or mouse grab    		 - move parameter one step up/down
+  CTRL + jk or arrow keys        - move parameter octave / 12 steps up/down
+  ALT + jk or arrow keys         - double/half parameter
+  ENTER                          - exit from edit mode saving changes 
+ 				   (where no auto exit)
+  ESC or SPACE                   - exit from edit mode discarding changes 
+				   (where no auto exit)
 
 
-## CLI
+                    Notes
 
-trics <command> [<args>]
+	  _ _   _ _ _   _ _   _ _ _
+	 |s|d| |g|h|j| |2|3| |5|6|7|
+ 	 |_|_| |_|_|_| |_|_| |_|_|_| _
+	|z|x|c|v|b|n|m|q|w|e|r|t|y|u|i|
+	|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|
 
-Default command:
 
-trics [options] <song_file>
+ 	    Command Line Interface
 
-    song_file       - song file to open
+Usage
 
-Options:
-    -o output_file        - Output song file
-    --midi device         - Connect MIDI input device
-    --mc cc param         - Map MIDI controll to parameter
-    -s                    - Play song without displaying interface
-    -h, --help            - Show this help
-    -v, --version         - Show version
+	trics <command> [<args>]
 
-Available commands:
+Default command
+
+  trics [options] <song_file>
+
+  	song_file       - song file to open
+
+  Options:
+  	-o output_file        - Output song file
+  	--midi device         - Connect MIDI input device
+  	--mc cc param         - Map MIDI controll to parameter
+  	-s                    - Play song without displaying interface
+  	-h, --help            - Show this help
+  	-v, --version         - Show version
+
+Available commands
 
   midi-list
   export
 
 
-## Defautl template
+	       Defautl template
 
-Instruments:
-    00 kick         - Kick drum
-    01 snare        - Snare drum
-    02 c_hat        - Closed high-hat
-    03 o_hat        - Open high-hat
+Instruments
 
-    10 lead         - Lead synth voice
-    11 s_pluck      - Short plucky synth
-    12 l_pluck      - Long plucky synth
-    13 pad          - Pad synth
-    14 sin_voice    - Synth almost sin wave
-    15 synth_drop   - Resonant synth drop
+  00 kick         - Kick drum
+  01 snare        - Snare drum
+  02 c_hat        - Closed high-hat
+  03 o_hat        - Open high-hat
 
-    20 bass         - Classic bass close to sin wave with punchy attack
-    21 saw_bass     - Classic bass based on the saw
-    22 pluck_bass   - Plucky bass synth
+  10 lead         - Lead synth voice
+  11 s_pluck      - Short plucky synth
+  12 l_pluck      - Long plucky synth
+  13 pad          - Pad synth
+  14 sin_voice    - Synth almost sin wave
+  15 synth_drop   - Resonant synth drop
 
-    30 noize_up     - Long noisy build-up
-    31 noize_down   - Long noisy drop
+  20 bass         - Classic bass close to sin wave with punchy attack
+  21 saw_bass     - Bass based on the saw
+  22 pluck_bass   - Plucky bass synth
+
+  30 noize_up     - Long noisy build-up
+  31 noize_down   - Long noisy drop
 
 Arpeggios
-    01 fast_up
-    02 fast_down
-    03 major_up
-    04 major_down
-    05 major_alt
-    06 minor_up
-    07 minor_down
-    08 minor_alt
-    09 power_alt
+
+  01 fast_up
+  02 fast_down
+  03 major_up
+  04 major_down
+  05 major_alt
+  06 minor_up
+  07 minor_down
+  08 minor_alt
+  09 power_alt
 
 
-## Examples
-
-[Demo-song]()
 
 
 
