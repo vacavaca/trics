@@ -1,31 +1,28 @@
-# Trics
-
-```
+ 
  ____  ____  ____  ___  ____
 (_  _)(  _ \(_  _)/ __)/ _ _)
   )(   )   / _)(_( (__ \__  \
  (__) (_)\_)(____)\___)(____/
 
-```
 
 Mighty tiny text-based chiptune tracker
+
 
 ## Keyboard layout
 
 ### Default mode
 
- hjkl or arrow keys                       - move cursor
- CTRL + hl or arrow keys or mouse click   - switch tab
- ALT + hl or arrow keys or mouse click    - switch sub tab
- CTRL + jk or arrow keys                  - move cursor one screen up/down
- ALT + jk or arrow keys                   - move cursor to the first/last row
+ hjkl or arrow                            - move cursor
+ CTRL + hl or CTRL + arrow or mouse click - switch tab
+ ALT + hl or ALT + arrow or mouse click   - switch sub tab
+ CTRL + jk or CTRL + arrow                - move cursor one screen up/down
+ ALT + jk or ALT + arrow                  - move cursor to the first/last row
  SPACE or mouse click                     - edit mode
  CTRL + SPACE                             - play from selection or stop
  CTRL + r                                 - start / stop recording (in pattern tab, with focus in track)
  y                                        - copy bar/pattern/table row
  p                                        - paste bar/pattern/table row
  s                                        - save song
- zsxdcvgbhnjmq2w3er5t6y7ui                - notes
 
 ### Edit mode
 
@@ -35,9 +32,40 @@ Mighty tiny text-based chiptune tracker
  ENTER                                    - exit from edit mode saving changes (where no auto exit)
  ESC or SPACE                             - exit from edit mode discarding changes (where no auto exit)
 
-### Recording mode
- zsxdcvgbhnjmq2w3er5t6y7ui                - notes
+### Notes
 
+```
+  _ _   _ _ _   _ _   _ _ _
+ |s|d| |g|h|j| |2|3| |5|6|7|
+ |_|_| |_|_|_| |_|_| |_|_|_| _
+|z|x|c|v|b|n|m|q|w|e|r|t|y|u|i|
+|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|
+
+```
+
+
+## CLI
+
+trics <command> [<args>]
+
+Default command:
+
+trics [options] <song_file>
+
+    song_file       - song file to open
+
+Options:
+    -o output_file        - Output song file
+    --midi device         - Connect MIDI input device
+    --mc cc param         - Map MIDI controll to parameter
+    -s                    - Play song without displaying interface
+    -h, --help            - Show this help
+    -v, --version         - Show version
+
+Available commands:
+
+  midi-list
+  export
 
 
 ## Defautl template
@@ -74,7 +102,9 @@ Arpeggios
     09 power_alt
 
 
+## Examples
 
+[Demo-song]()
 
 
 

@@ -24,7 +24,7 @@ _Static_assert(sizeof(int) == 4, "Never gonna give you up");
 typedef enum {
     OPERATOR_EQ = '=',
     OPERATOR_ADD = '+',
-    OPERATOR_SADD = '~',
+    OPERATOR_QADD = '~',
 } Operator;
 
 const char WAVETYPE_NOIZE;
