@@ -5,8 +5,8 @@
 
 
 <p align="center">
-<a href="https://github.com/vacavaca/trics/blob/master/doc/MANUAL"> :sparkles: <b>How to use</b></a></p>&nbsp;&nbsp;
-<a href="https://github.com/vacavaca/trics/releases"><b>Download</b></a></p>&nbsp;&nbsp;
+<a href="https://github.com/vacavaca/trics/blob/master/doc/MANUAL"> :sparkles: <b>How to use</b></a>&nbsp;&nbsp;
+<a href="https://github.com/vacavaca/trics/releases"><b>Download</b></a>&nbsp;&nbsp;
 <a href="https://github.com/vacavaca/trics/blob/master/doc/BUILD"><b>Build</b></a></p>
 
 <p align="center">
