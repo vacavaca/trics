@@ -4,4 +4,6 @@
 <p align="center">:video_game: :notes: <b>Mighty tiny text-based chiptune tracker</b></p>
 
 <p align="center"><a href="https://github.com/vacavaca/cid/blob/master/doc/MANUAL"> :sparkles: <b>How to use</b></a></p>
+
+
 ![Screenshot](/doc/screenshot.png)
