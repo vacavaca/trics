@@ -1,0 +1,16 @@
+Building trics
+
+
+Requirements:
+
+    make, gcc, libncurses-dev
+
+Set-up:
+
+    To compile the project simply run: `make`
+
+    Binary will be placed to bin/trics
+
+Makefile targets:
+
+    clean   - clean everything, delete object files and target dir
