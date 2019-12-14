@@ -30,7 +30,7 @@
 * MIDI input and parameter mapping
 * Stereo output
 
-Inspired by sound and design of the MOS Technology's SID chips.
+Inspired by the sound and design of the MOS Technology's SID chips.
 
 
 ## License

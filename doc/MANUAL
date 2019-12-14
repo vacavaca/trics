@@ -38,36 +38,45 @@ Available commands
 
                      Keyboard Layout
 
-Default mode
-
-  hjkl or arrow                  - move cursor
-  CTRL + hl or CTRL + arrow     - switch tab
+General
+  arrow or h/j/k/l               - move cursor
+  CTRL + arrow or CTRL + h/l     - switch tab
   or mouse click 
 
-  ALT + hl or ALT + arrow        - switch sub tab
+  ALT + arrow or ALT + h/l       - switch sub tab
   or mouse click
-  CTRL + jk or CTRL + arrow      - move cursor one screen up/down
-  ALT + jk or ALT + arrow        - move cursor to the first/last row
+
+  ALT + s                        - go to song tab
+  ALT + p                        - go to pattern tab
+  ALT + i                        - go to instrument tab
+  ALT + w                        - go to wave tab
+  ALT + f                        - go to filter tab
+  ALT + a                        - go to arpeggio tab
+  CTRL + arrow or CTRL + j/k     - move cursor one screen up/down
+  ALT + arrow or ALT + j/k       - move cursor to the first/last row
+  mouse wheel                    - scroll table
+  y                              - copy bar/pattern/table row
+  p                              - paste bar/pattern/table row
+  CTRL + c                       - quit
+
+Default mode
   SPACE or mouse click           - edit mode
   CTRL + SPACE                   - play from selection or stop
   CTRL + r                       - start / stop recording
-                                   (in pattern tab, with focus in track)
-  y                              - copy bar/pattern/table row
-  p                              - paste bar/pattern/table row
-  s                              - save song
 
 Edit mode
+  arrow or j/k                   - move parameter one step up/down
+  or mouse wheel     
 
-  jk or arrow keys               - move parameter one step up/down
-  or mouse grab 
-  or mouse scroll               
-  CTRL + jk or arrow keys        - move parameter by octave 
+  CTRL + arrow or CTRL + j/k     - move parameter by octave 
                                    (12 steps up/down)
-  ALT + jk or arrow keys         - double/half parameter
+  ALT + arrow or ALT + j/k       - double/half parameter
   ENTER                          - exit from edit mode saving changes 
                                    (where no auto exit)
   ESC or SPACE                   - exit from edit mode discarding changes
                                    (where no auto exit)
+
+Tip: If you accidentally hit CTRL + S press CTRL + Q to unfreeze your terminal emulator.
 
 
                        Notes Layout

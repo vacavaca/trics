@@ -98,7 +98,12 @@ void control_draw_bool(WINDOW *win, Control const *control) {
 
 void control_draw_int(WINDOW *win, Control const *control) {
     wmove(win, control->y, control->x);
-    wprintw(win, "%02x", *control->int_value);
+    int value = *control->int_value;
+    if (value != EMPTY) {
+        wprintw(win, "%02x", *control->int_value);
+    } else {
+        wprintw(win, "--");
+    }
 }
 
 void control_draw_text(WINDOW *win, Control const *control) {
@@ -119,6 +124,8 @@ void control_draw_text(WINDOW *win, Control const *control) {
 
 void control_draw(WINDOW *win, Control const *control) {
     attron(COLOR_PAIR(UI_COLOR_BRIGHT));
+    // attron(COLOR_PAIR(UI_COLOR_INVERSE));
+    // attron(A_BOLD);
     if (control->type == CONTROL_TYPE_BOOL) {
         control_draw_bool(win, control);
     } else if (control->type == CONTROL_TYPE_INT) {
@@ -127,6 +134,8 @@ void control_draw(WINDOW *win, Control const *control) {
         control_draw_text(win, control);
     }
     attroff(COLOR_PAIR(UI_COLOR_BRIGHT));
+    // attroff(A_BOLD);
+    // attroff(COLOR_PAIR(UI_COLOR_INVERSE));
 }
 
 ControlTable *control_table_init(int column_count, int x, int y, int width,
@@ -139,20 +148,23 @@ ControlTable *control_table_init(int column_count, int x, int y, int width,
         return NULL;
     }
 
-    char **table_headers = malloc(sizeof(char *));
-    if (table_headers == NULL) {
-        goto cleanup_list;
-    }
-
+    char **table_headers = NULL;
     int i = 0;
-    for (; i < column_count; i++) {
-        const size_t len = strlen(headers[i]);
-        char *header = malloc(len + 1);
-        if (header == NULL) {
-            goto cleanup;
+    if (headers != NULL) {
+        table_headers = malloc(sizeof(char *));
+        if (table_headers == NULL) {
+            goto cleanup_list;
         }
-        memcpy(header, headers[i], len + 1);
-        table_headers[i] = header;
+
+        for (; i < column_count; i++) {
+            const size_t len = strlen(headers[i]);
+            char *header = malloc(len + 1);
+            if (header == NULL) {
+                goto cleanup;
+            }
+            memcpy(header, headers[i], len + 1);
+            table_headers[i] = header;
+        }
     }
 
     ControlTable *table = malloc(sizeof(ControlTable));
@@ -174,7 +186,9 @@ cleanup:
     for (int j = 0; j < i; j++) {
         free(table_headers[j]);
     }
-    free(table_headers);
+    if (headers != NULL) {
+        free(table_headers);
+    }
 cleanup_list:
     ref_list_free(list);
     return NULL;
@@ -282,18 +296,12 @@ bool interface_set_layout(Interface *interface, int tab, Layout *layout) {
     return ref_list_set(interface->layouts, tab, layout);
 }
 
-bool init_layouts(Interface *interface, Song *const song) {
-    Layout *song_layout = layout_init();
-    if (song_layout == NULL) {
-        return false;
-    }
-
+ControlTable *init_song_params_table(Layout *layout, Song *const song) {
     char const *song_params_headers[3] = {"bp", "st", "title"};
     ControlTable *song_params_table = control_table_init(3, 2, 3, 23,
                                                          song_params_headers);
-
     if (song_params_table == NULL) {
-        goto cleanup_song_layout;
+        return NULL;
     }
 
     Control song_param_controls[3] = {
@@ -303,23 +311,83 @@ bool init_layouts(Interface *interface, Song *const song) {
     };
 
     if (!control_table_add(song_params_table, song_param_controls)) {
+        control_table_free(song_params_table);
+        return NULL;
+    }
+
+    return song_params_table;
+}
+
+ControlTable *init_song_arrangement_table(Layout *layout, Song *const song) {
+    ControlTable *arrangement_table = control_table_init(8, 2, 6, 23, NULL);
+    if (arrangement_table == NULL) {
+        return NULL;
+    }
+
+    for (int i = 0; i < 8; i++) {
+        Control arrangement_row[8] = {
+            control_init_int(&song->patterns[i][0]),
+            control_init_int(&song->patterns[i][1]),
+            control_init_int(&song->patterns[i][2]),
+            control_init_int(&song->patterns[i][3]),
+            control_init_int(&song->patterns[i][4]),
+            control_init_int(&song->patterns[i][5]),
+            control_init_int(&song->patterns[i][6]),
+            control_init_int(&song->patterns[i][7]),
+        };
+
+        if (!control_table_add(arrangement_table, arrangement_row)) {
+            control_table_free(arrangement_table);
+            return NULL;
+        }
+    }
+
+    return arrangement_table;
+}
+
+Layout* init_song_layout(Song *const song) {
+    Layout *layout = layout_init();
+    if (layout == NULL) {
+        return NULL;
+    }
+
+    ControlTable *params_table = init_song_params_table(layout, song);
+    if (params_table == NULL) {
+        goto cleanup_layout;
+    }
+
+    if (!layout_add_table(layout, params_table)) {
         goto cleanup_song_table;
     }
 
-    if (!layout_add_table(song_layout, song_params_table)) {
+    ControlTable *arrangement_table = init_song_arrangement_table(layout, song);
+    if (arrangement_table == NULL) {
         goto cleanup_song_table;
     }
 
-    if (!interface_set_layout(interface, TAB_SONG, song_layout)) {
-        goto cleanup_song_table;
+    if (!layout_add_table(layout, arrangement_table)) {
+        goto cleanup_arrangement_table;
     }
+
+    return layout;
+
+cleanup_arrangement_table:
+    control_table_free(arrangement_table);
+cleanup_song_table:
+    control_table_free(params_table);
+cleanup_layout:
+    layout_free(layout);
+    return NULL;
+}
+
+bool init_layouts(Interface *interface, Song *const song) {
+    Layout *song_layout = init_song_layout(song);
+    if (song_layout == NULL) {
+        return false;
+    }
+    interface_set_layout(interface, TAB_SONG, song_layout);
 
     return true;
-
-cleanup_song_table:
-    control_table_free(song_params_table);
-cleanup_song_layout:
-    layout_free(song_layout);
 
     return false;
 }
@@ -617,12 +685,56 @@ bool handle_mouse_tab_switch(Interface *interface, Input const *input) {
     return false;
 }
 
+bool handle_quick_tab(Interface *interface, Input const *input) {
+    const Input test_alt_s = input_init_modified_key(MODIFIER_KEY_ALT, 's');
+    if (input_eq(input, &test_alt_s)) {
+        interface->selected_tab = TAB_SONG;
+        return true;
+    }
+
+    const Input test_alt_p = input_init_modified_key(MODIFIER_KEY_ALT, 'p');
+    if (input_eq(input, &test_alt_p)) {
+        interface->selected_tab = TAB_PATTERN;
+        return true;
+    }
+
+    const Input test_alt_i = input_init_modified_key(MODIFIER_KEY_ALT, 'i');
+    if (input_eq(input, &test_alt_i)) {
+        interface->selected_tab = TAB_INSTRUMENT;
+        return true;
+    }
+
+    const Input test_alt_w = input_init_modified_key(MODIFIER_KEY_ALT, 'w');
+    if (input_eq(input, &test_alt_w)) {
+        interface->selected_tab = TAB_WAVE;
+        return true;
+    }
+
+    const Input test_alt_f = input_init_modified_key(MODIFIER_KEY_ALT, 'f');
+    if (input_eq(input, &test_alt_f)) {
+        interface->selected_tab = TAB_FILTER;
+        return true;
+    }
+
+    const Input test_alt_a = input_init_modified_key(MODIFIER_KEY_ALT, 'a');
+    if (input_eq(input, &test_alt_a)) {
+        interface->selected_tab = TAB_ARPEGGIO;
+        return true;
+    }
+
+    return false;
+}
+
 bool try_handle_input(Interface *interface, Input const *input) {
     if (handle_key_tab_switch(interface, input)) {
         return true;
     }
 
     if (handle_mouse_tab_switch(interface, input)) {
+        return true;
+    }
+
+    if (handle_quick_tab(interface, input)) {
         return true;
     }
 
@@ -659,4 +771,5 @@ void init_colors(void) {
     init_pair(UI_COLOR_WHITE, COLOR_WHITE, COLOR_BLACK);
     init_pair(UI_COLOR_GREY, 8, COLOR_BLACK);
     init_pair(UI_COLOR_BRIGHT, 15, COLOR_BLACK);
+    init_pair(UI_COLOR_INVERSE, 16, COLOR_WHITE);
 }

@@ -24,7 +24,8 @@ typedef enum
     UI_COLOR_YELLOW,
     UI_COLOR_WHITE,
     UI_COLOR_GREY,
-    UI_COLOR_BRIGHT
+    UI_COLOR_BRIGHT,
+    UI_COLOR_INVERSE,
 } Color;
 
 typedef struct {
