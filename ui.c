@@ -187,11 +187,12 @@ bool control_table_add(ControlTable *table, Control const *row) {
 
     memcpy(table_row, row, size);
 
-    int offset = 0;
+    int y_offset = table->headers != NULL ? 1 : 0;
+    int x_offset = 0;
     for (int i = 0; i < table->column_count; i++) {
-        table_row[i].y = table->y + 1 + table->rows->length;
-        table_row[i].x = table->x + offset;
-        offset += table_row[i].width + 1;
+        table_row[i].y = table->y + y_offset + table->rows->length;
+        table_row[i].x = table->x + x_offset;
+        x_offset += table_row[i].width + 1;
     }
 
     if (!ref_list_add(table->rows, table_row)) {
@@ -203,14 +204,16 @@ bool control_table_add(ControlTable *table, Control const *row) {
 }
 
 void control_table_draw(WINDOW *win, ControlTable const *table) {
-    int offset = 0;
-    Control *first_row = ref_list_get(table->rows, 0);
-    for (int i = 0; i < table->column_count; i++) {
-        int x = table->x + offset;
-        offset += first_row[i].width + 1;
+    if (table->headers != NULL) {
+        int offset = 0;
+        Control *first_row = ref_list_get(table->rows, 0);
+        for (int i = 0; i < table->column_count; i++) {
+            int x = table->x + offset;
+            offset += first_row[i].width + 1;
 
-        wmove(win, table->y, x);
-        wprintw(win, table->headers[i]);
+            wmove(win, table->y, x);
+            wprintw(win, table->headers[i]);
+        }
     }
 
     for (int i = 0; i < table->rows->length; i++) {

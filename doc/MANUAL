@@ -1,13 +1,39 @@
+
 		 ____  ____  ____  ___  ____
 		(_  _)(  _ \(_  _)/ __)/ _ _)
 	  	  )(  )    / _)(_( (__ \__  \
 	 	 (__) (_)\_)(____)\___)(____/
 
-	
     	    Mighty tiny text-based chiptune tracker                    
 
 
-	   	       Keyboard layout
+ 	  	     Command Line Interface
+
+Usage
+
+	trics <command> [<args>]
+
+Default command
+
+  trics [options] <song_file>
+
+  	song_file       - song file to open
+
+  Options:
+  	-o output_file        - Output song file
+  	--midi device         - Connect MIDI input device
+  	--mc cc param         - Map MIDI controll to parameter
+  	-s                    - Play song without displaying interface
+  	-h, --help            - Show this help
+  	-v, --version         - Show version
+
+Available commands
+
+  midi-list
+  export
+
+
+	   	        Keyboard Layout
 
 Default mode
 
@@ -41,7 +67,7 @@ Edit mode
 				   (where no auto exit)
 
 
-                   	     Notes
+                   	  Notes Layout
 
 		  _ _   _ _ _   _ _   _ _ _
 		 |s|d| |g|h|j| |2|3| |5|6|7|
@@ -50,96 +76,54 @@ Edit mode
 		|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|
 
 
- 	  	     Command Line Interface
+			   Interface
 
-Usage
+Number format
 
-	trics <command> [<args>]
+  In trics all numeric parameters are integers and in the interface 
+  they are represented as hex digits, for example: 80 in hex = 128 in dec.
 
-Default command
+  Minimum numeric value is 00
+  Maximum for integers is ff (255), for booleans - 01
 
-  trics [options] <song_file>
+  Different parameters may have different maximum and minimum allowed values.
 
-  	song_file       - song file to open
+Song arrangement tab
+ __________________________
+ |                          |
+ | *SONG  PATT  INST  ARP   | <---- Tabs
+ |                          |
+ |  bp st title             | <---- Main song parameters:
+ |  80 10 Song Title lol... |         bp - BPM (tempo)
+ |                          |         st - Steps, number of steps in a pattern
+ |  00 -- 03 01 -- 03 ff r4 | --        title - Song title
+ |  00 -- 03 01 -- 03 ff r4 |  |
+ |  00 -- 03 01 -- 03 ff r4 |  |
+ |  00 -- 03 01 -- 03 ff r4 |  |--- Pattern arrangement table
+ |  00 -- 03 01 -- 03 ff r4 |  |    enter pattern numbers here
+ |  00 -- 03 01 -- 03 ff r4 |  |    to arrange your song
+ |  01 43 -- -- -- -- -- -- |  | 
+ |> 01 43 -- -- -- -- -- -- | --
+ |                          |
+ |  ...            CTRL + h | <---- Shows pressed keys and mouse events
+ |__________________________|
+ 
+ ">" Shows currently played bar  
+ 
+ "..." Indicates that there are more table rows hidden bellow.
 
-  Options:
-  	-o output_file        - Output song file
-  	--midi device         - Connect MIDI input device
-  	--mc cc param         - Map MIDI controll to parameter
-  	-s                    - Play song without displaying interface
-  	-h, --help            - Show this help
-  	-v, --version         - Show version
+Pattern tab
 
-Available commands
+Instrument tab
 
-  midi-list
-  export
+Wave table tab
 
+Filter table tab
 
-	       	 	Default template
-
-Instruments
-
-  00 kick         - Kick drum
-  01 snare        - Snare drum
-  02 c_hat        - Closed high-hat
-  03 o_hat        - Open high-hat
-
-  10 lead         - Lead synth voice
-  11 s_pluck      - Short plucky synth
-  12 l_pluck      - Long plucky synth
-  13 pad          - Pad synth
-  14 sin_voice    - Synth almost sin wave
-  15 synth_drop   - Resonant synth drop
-
-  20 bass         - Classic bass close to sin wave with punchy attack
-  21 saw_bass     - Bass based on the saw
-  22 pluck_bass   - Plucky bass synth
-
-  30 noize_up     - Long noisy build-up
-  31 noize_down   - Long noisy drop
-
-Arpeggios
-
-  01 fast_up
-  02 fast_down
-  03 major_up
-  04 major_down
-  05 major_alt
-  06 minor_up
-  07 minor_down
-  08 minor_alt
-  09 power_alt
+Arpeggio tab
 
 
 
-
-
-
-```
- *SONG  PATT  INST  ARP
-
-  bp st title
-  80 20 Song Title lol...
-
-  00 -- 03 01 -- 03 ff r4
-  00 -- 03 01 -- 03 ff r4
-  00 -- 03 01 -- 03 ff r4
-  00 -- 03 01 -- 03 ff r4
-  00 -- 03 01 -- 03 ff r4
-  00 -- 03 01 -- 03 ff r4
-  01 43 -- -- -- -- -- --
-> 01 43 -- -- -- -- -- --
-
-  ...    song_title_lo...
-```
-
-
-
-
-
-
-```
   SONG *PATT  INST  ARP
 
   ## o1 o2
@@ -155,7 +139,7 @@ Arpeggios
   00 C#   --   -- ---- --
   00 C#   --   -- ---- --
   ...             ALT + K
-```
+
 
 
 
@@ -175,7 +159,7 @@ Arpeggios
 
 
 
-  ...    song_title_lo...
+         song_title_lo...
 ```
 
 
@@ -244,7 +228,40 @@ Arpeggios
 ```
 
 
+	       	 	Default template
 
+Instruments
+
+  00 kick         - Kick drum
+  01 snare        - Snare drum
+  02 c_hat        - Closed high-hat
+  03 o_hat        - Open high-hat
+
+  10 lead         - Lead synth voice
+  11 s_pluck      - Short plucky synth
+  12 l_pluck      - Long plucky synth
+  13 pad          - Pad synth
+  14 sin_voice    - Synth almost sin wave
+  15 synth_drop   - Resonant synth drop
+
+  20 bass         - Classic bass close to sin wave with punchy attack
+  21 saw_bass     - Bass based on the saw
+  22 pluck_bass   - Plucky bass synth
+
+  30 noize_up     - Long noisy build-up
+  31 noize_down   - Long noisy drop
+
+Arpeggios
+
+  01 fast_up
+  02 fast_down
+  03 major_up
+  04 major_down
+  05 major_alt
+  06 minor_up
+  07 minor_down
+  08 minor_alt
+  09 power_alt
 
 
 
