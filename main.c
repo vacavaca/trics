@@ -52,9 +52,12 @@ void sleep_msec(int ms) {
 }
 
 int main(int argc, char *argv[]) {
-    Interface interface;
 
-    if (!interface_init(&interface)) {
+    Song *song = song_init("Song Title");
+
+    Interface *interface = interface_init(song);
+
+    if (interface == NULL) {
         fprintf(stderr, "Failed to initialize interface\n");
         exit(1);
     }
@@ -70,14 +73,9 @@ int main(int argc, char *argv[]) {
     start_color();
     init_pair(1, COLOR_YELLOW, COLOR_BLACK);
 
-    int last_write = 0;
-    int i = 0;
+    int t = 0;
     while (true) {
-        sleep_msec(8);
-
-        if (i - last_write > 48) {
-            wclear(win);
-        }
+        sleep_msec(REFRESH_RATE_MSEC);
 
         Input input;
         if (input_read(&input)) {
@@ -85,25 +83,23 @@ int main(int argc, char *argv[]) {
                 return 0;
             }
 
-            char *repr = input_repr(&input);
-            size_t repr_len = strlen(repr);
-            if (repr_len > 0) {
-                last_write = i;
-                wclear(win);
-            }
-            wmove(win, 15, 25 - repr_len);
-            attron(COLOR_PAIR(1));
-            wprintw(win, repr);
-            attroff(COLOR_PAIR(1));
+            interface_handle_input(interface, &input);
+            // size_t repr_len = strlen(repr);
+            // if (repr_len > 0) {
+            //     last_write = i;
+            //     wclear(win);
+            // }
+            // wmove(win, 15, 25 - repr_len);
+            // attron(COLOR_PAIR(1));
+            // wprintw(win, repr);
+            // attroff(COLOR_PAIR(1));
         }
 
-        if (!interface_draw(win, &interface)) {
-            endwin();
-            fprintf(stderr, "Failed to draw interface\n");
-            return 1;
-        }
+        interface_draw(win, interface, t * REFRESH_RATE_MSEC);
+        wmove(win, 25, 1);
+        wprintw(win, "%d", t * REFRESH_RATE_MSEC);
         wrefresh(win);
-        i += 1;
+        t += 1;
     }
 
     return 0;

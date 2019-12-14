@@ -2,6 +2,8 @@
 #define MUSIC_H
 
 #include <stdbool.h> // bool
+#include <stdlib.h>  // malloc
+#include <string.h>  // memcpy
 
 #define MAX_WAVE_STEPS 16
 #define MIN_WAVE_STEP 4
@@ -70,7 +72,7 @@ typedef struct {
 } Filter;
 
 typedef struct {
-    char const *name;
+    char *name;
     volatile int volume;
     volatile bool hard_restart;
 
@@ -83,11 +85,13 @@ typedef struct {
     Filter filter;
 } Instrument;
 
-Instrument instrument_init(char const *name);
+Instrument *instrument_init(char const *name);
 
 void instrument_set_wave_step(Instrument *instrument, WaveStep step, int n);
 
 void instrument_set_filter_step(Instrument *instrument, FilterStep step, int n);
+
+void instrument_free(Instrument *instrument);
 
 typedef struct {
     volatile Operator pitch_operator;
@@ -95,12 +99,16 @@ typedef struct {
 } ArpeggioStep;
 
 typedef struct {
-    char const *name;
+    char *name;
     ArpeggioStep steps[MAX_ARPEGGIO_STEPS];
     volatile bool repeat;
     volatile int step;
     volatile int length;
 } Arpeggio;
+
+Arpeggio *arpeggio_init(char const *name);
+
+void arpeggio_free(Arpeggio *arpeggio);
 
 typedef struct {
     volatile int instrument;
@@ -114,11 +122,17 @@ typedef struct {
 } Pattern;
 
 typedef struct {
+    char *name;
     volatile int length;
     volatile int bpm;
+    volatile int step;
     volatile int patterns[MAX_SONG_LENGTH][MAX_TRACKS];
 } Song;
 
+Song *song_init(char const *name);
+
 int song_set_pattern(Song *song, int nbar, int nvoice, int pattern);
+
+void song_free(Song *song);
 
 #endif // MUSIC_H

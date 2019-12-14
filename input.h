@@ -59,8 +59,21 @@ typedef struct {
     };
 } Input;
 
-int input_read(Input *input);
 
-char * input_repr(Input const *input);
+Input input_init_key(char const ch);
+
+Input input_init_special(SpecialKey key);
+
+Input input_init_modified_key(char modifier, char const ch);
+
+Input input_init_modified_special(char modifier, SpecialKey key);
+
+bool input_read(Input *input);
+
+char *input_repr(Input const *input);
+
+bool input_eq(Input const *a, Input const *b);
+
+bool input_mouse_event_eq(Input const *a, MouseEvent event, MouseButton button);
 
 #endif // INPUT_H

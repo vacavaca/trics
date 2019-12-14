@@ -1,13 +1,25 @@
 #ifndef UI_H
 #define UI_H
 
+#include "input.h"   // Input
+#include "music.h"   // Song
 #include <assert.h>  // assert
 #include <ncurses.h> // wmove wprintw
 #include <stdbool.h> // bool
-#include <stdlib.h> // malloc
+#include <stdlib.h>  // malloc
+#include <string.h>  // memcpy
 
-#define DEFAULT_VEC_CAPACITY 64
-#define MAX_TABLE_WIDTH 8
+#define DEFAULT_LIST_CAPACITY 64
+#define MAX_TEXT_WIDTH 24
+#define MAX_TABLE_COLUMNS 8
+#define REFRESH_RATE_MSEC 8
+
+typedef struct {
+    size_t item_size;
+    int cap;
+    int length;
+    void **array;
+} RefList;
 
 typedef enum {
     CONTROL_TYPE_BOOL,
@@ -39,30 +51,15 @@ typedef struct
     int width;
 } Control;
 
-Control control_init_bool(volatile bool *const value);
-
-Control control_init_int(volatile int *const value);
-
-Control control_init_text(char *const value);
-
 typedef struct
 {
-    char const **headers;
+    char **headers;
     int column_count;
-    Control const **controls;
-    int capacity;
-    int length;
+    RefList *rows;
     int x;
     int y;
     int width;
 } ControlTable;
-
-int control_table_init(int column_count, int x, int y, int width,
-                       char const **headers, ControlTable *table);
-
-int control_table_add(ControlTable *table, Control const *row);
-
-void control_table_free(ControlTable *table);
 
 typedef enum {
     TAB_SONG,
@@ -73,6 +70,10 @@ typedef enum {
     TAB_ARPEGGIO,
 } Tab;
 
+typedef struct {
+    RefList *tables;
+} Layout;
+
 const Tab PRIMARY_TABS[4];
 
 const Tab SECONDARY_TABS[3];
@@ -80,25 +81,18 @@ const Tab SECONDARY_TABS[3];
 typedef struct
 {
     Tab selected_tab;
-    bool continuation;
-    ControlTable *tables;
-    Control *focus;
-    int tables_count;
-    int capacity;
-    bool show_filename;
-    char const *filename;
+    RefList *layouts;
+    char *input_repr;
+    int input_repr_length;
+    int input_repr_printed_at;
 } Interface;
 
-int interface_init(Interface *interface);
+Interface *interface_init(Song *song);
 
-int interface_add_table(Interface *interface, ControlTable table);
+void interface_draw(WINDOW *win, Interface *interface, int draw_time);
 
-void interface_next_primary_tab(Interface *interface);
+void interface_handle_input(Interface *interface, Input const *input);
 
-void interface_prev_primary_tab(Interface *interface);
-
-int interface_draw(WINDOW *win, Interface *interface);
-
-int interface_fee(Interface *interface);
+void interface_fee(Interface *interface);
 
 #endif // UI_H

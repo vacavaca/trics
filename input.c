@@ -7,6 +7,36 @@ const char *ARROW_ESC = "\x1B\x5B\0";
 const char *MOD_ARROW_ESC = "\x1B\x5B\x31\x3B\0";
 const char *MOUSE_ESC = "\x1B\x5B\x4D\0";
 
+Input input_init_key(char const ch) {
+    return (Input){
+        .type = INPUT_TYPE_KEY,
+        .key.special = false,
+        .key.ch = ch};
+}
+
+Input input_init_special(SpecialKey key) {
+    return (Input){
+        .type = INPUT_TYPE_KEY,
+        .key.special = true,
+        .key.special_key = key};
+}
+
+Input input_init_modified_key(char modifier, char const ch) {
+    return (Input){
+        .type = INPUT_TYPE_KEY,
+        .key.special = false,
+        .key.modifier = modifier,
+        .key.ch = ch};
+}
+
+Input input_init_modified_special(char modifier, SpecialKey key) {
+    return (Input){
+        .type = INPUT_TYPE_KEY,
+        .key.special = true,
+        .key.modifier = modifier,
+        .key.special_key = key};
+}
+
 bool starts_with(char const *haystack, int len, char const *needle) {
     for (int i = 0; i < len; i++) {
         const char h = haystack[i];
@@ -73,25 +103,16 @@ int get_chars(char **keys) {
     return len;
 }
 
-int parse_single(char key, Input *input) {
+bool parse_single(char key, Input *input) {
     if (key == 9) {
-        *input = (Input){
-            .type = INPUT_TYPE_KEY,
-            .key.special = true,
-            .key.special_key = SPECIAL_KEY_TAB};
-        return 1;
+        *input = input_init_special(SPECIAL_KEY_TAB);
+        return true;
     } else if (key == 13) {
-        *input = (Input){
-            .type = INPUT_TYPE_KEY,
-            .key.special = true,
-            .key.special_key = SPECIAL_KEY_ENTER};
-        return 1;
+        *input = input_init_special(SPECIAL_KEY_ENTER);
+        return true;
     } else if (key == 27) {
-        *input = (Input){
-            .type = INPUT_TYPE_KEY,
-            .key.special = true,
-            .key.special_key = SPECIAL_KEY_ESC};
-        return 1;
+        *input = input_init_special(SPECIAL_KEY_ESC);
+        return true;
     } else if ((key & 96) == 0) {
         char rev = key + 96;
         if (key == 0) {
@@ -100,30 +121,23 @@ int parse_single(char key, Input *input) {
             rev = key + 24;
         }
 
-        *input = (Input){
-            .type = INPUT_TYPE_KEY,
-            .key.special = false,
-            .key.modifier = MODIFIER_KEY_CTRL,
-            .key.ch = rev};
-        return 1;
+        *input = input_init_modified_key(MODIFIER_KEY_CTRL, rev);
+        return true;
     } else {
-        *input = (Input){
-            .type = INPUT_TYPE_KEY,
-            .key.special = false,
-            .key.ch = key};
-        return 1;
+        *input = input_init_key(key);
+        return true;
     }
 
-    return 0;
+    return true;
 }
 
-int parse_double(char const *keys, Input *input) {
+bool parse_double(char const *keys, Input *input) {
     if (keys[0] == 27 && parse_single(keys[1], input)) {
         input->key.modifier |= MODIFIER_KEY_ALT;
-        return 1;
+        return true;
     }
 
-    return 0;
+    return false;
 }
 
 SpecialKey char_to_arrow(char key) {
@@ -140,19 +154,16 @@ SpecialKey char_to_arrow(char key) {
     return 0;
 }
 
-int parse_arrows(char const *keys, Input *input) {
+bool parse_arrows(char const *keys, Input *input) {
     if (starts_with(keys, 3, ARROW_ESC)) {
-        *input = (Input){
-            .type = INPUT_TYPE_KEY,
-            .key.special = true,
-            .key.special_key = char_to_arrow(keys[2])};
-        return 1;
+        *input = input_init_special(char_to_arrow(keys[2]));
+        return true;
     }
 
-    return 0;
+    return false;
 }
 
-int parse_navigation(char const *keys, Input *input) {
+bool parse_navigation(char const *keys, Input *input) {
     if (starts_with(keys, 6, MOD_ARROW_ESC)) {
         int modifier = 0;
         const int check = keys[4] - 33;
@@ -163,16 +174,12 @@ int parse_navigation(char const *keys, Input *input) {
             modifier |= MODIFIER_KEY_CTRL;
         }
 
-        *input = (Input){
-            .type = INPUT_TYPE_KEY,
-            .key.special = true,
-            .key.modifier = modifier,
-            .key.special_key = char_to_arrow(keys[5])};
-        return 1;
+        *input = input_init_modified_special(modifier, char_to_arrow(keys[5]));
+        return true;
     } else if (starts_with(keys, 6, MOUSE_ESC)) {
-        char b = keys[3] - 32;
-        char x = keys[4] - 32;
-        char y = keys[5] - 32;
+        const char b = keys[3] - 32;
+        const char x = keys[4] - 32;
+        const char y = keys[5] - 32;
 
         if (b == 0 || b == 3) {
             MouseEvent event = b == 0
@@ -197,14 +204,14 @@ int parse_navigation(char const *keys, Input *input) {
                 .mouse.event = event,
                 .mouse.x = x,
                 .mouse.y = y};
-            return 1;
+            return true;
         }
     }
 
-    return 0;
+    return false;
 }
 
-int parse(char const *keys, int len, Input *input) {
+bool parse(char const *keys, int len, Input *input) {
     if (len == 1) {
         return parse_single(keys[0], input);
     } else if (len == 2) {
@@ -215,17 +222,17 @@ int parse(char const *keys, int len, Input *input) {
         return parse_navigation(keys, input);
     }
 
-    return 0;
+    return false;
 }
 
-int input_read(Input *input) {
+bool input_read(Input *input) {
     char *keys;
     int len;
     if ((len = get_chars(&keys)) > 0) {
         return parse(keys, len, input);
     }
 
-    return 0;
+    return false;
 }
 
 typedef struct
@@ -236,12 +243,12 @@ typedef struct
 
 Repr repr_init(void) {
     return (Repr){
-        .buffer = (char[1]){0},
+        .buffer = NULL,
         .length = 0};
 }
 
 void repr_concat(Repr *repr, char const *value) {
-    size_t len = strlen(value);
+    const size_t len = strlen(value);
     if (repr->length > 0) {
         repr->buffer = realloc(repr->buffer, repr->length + len + 1);
         strcat(repr->buffer, value);
@@ -315,4 +322,47 @@ char *input_repr(Input const *input) {
     }
 
     return repr.buffer;
+}
+
+bool input_eq(Input const *a, Input const *b) {
+    InputType type = a->type;
+    if (type != b->type) {
+        return false;
+    }
+
+    if (type == INPUT_TYPE_KEY) {
+        bool special = a->key.special;
+
+        if (special != b->key.special) {
+            return false;
+        }
+
+        if (a->key.modifier != b->key.modifier) {
+            return false;
+        }
+
+        if (special) {
+            return a->key.special_key == b->key.special_key;
+        } else {
+            return a->key.ch == b->key.ch;
+        }
+    } else {
+        if (a->mouse.event != b->mouse.event) {
+            return false;
+        }
+
+        if (a->mouse.button != b->mouse.button) {
+            return false;
+        }
+
+        return a->mouse.x == b->mouse.x && a->mouse.y == b->mouse.y;
+    }
+}
+
+bool input_mouse_event_eq(Input const *a, MouseEvent event, MouseButton button) {
+    if (a->type != INPUT_TYPE_MOUSE) {
+        return false;
+    }
+
+    return a->mouse.event == event && a->mouse.button == button;
 }
