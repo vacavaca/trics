@@ -4,11 +4,7 @@ on: [push]
 
 jobs:
   build:
-     strategy:
-      matrix:
-        platform: [ubuntu-latest]
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: ubuntu-latest
     
     steps:
     - name: Install libncurses5-dev
