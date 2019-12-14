@@ -118,6 +118,7 @@ void control_draw_text(WINDOW *win, Control const *control) {
 }
 
 void control_draw(WINDOW *win, Control const *control) {
+    attron(COLOR_PAIR(UI_COLOR_BRIGHT));
     if (control->type == CONTROL_TYPE_BOOL) {
         control_draw_bool(win, control);
     } else if (control->type == CONTROL_TYPE_INT) {
@@ -125,6 +126,7 @@ void control_draw(WINDOW *win, Control const *control) {
     } else if (control->type == CONTROL_TYPE_TEXT) {
         control_draw_text(win, control);
     }
+    attroff(COLOR_PAIR(UI_COLOR_BRIGHT));
 }
 
 ControlTable *control_table_init(int column_count, int x, int y, int width,
@@ -353,6 +355,8 @@ Interface *interface_init(Song *const song) {
 void draw_primary_tabs(WINDOW *win, Interface const *interface) {
     const char *name;
 
+    attron(COLOR_PAIR(UI_COLOR_BRIGHT));
+
     wmove(win, 1, 1);
     name = interface->selected_tab == TAB_SONG ? "*SONG" : " SONG";
     wprintw(win, name);
@@ -371,9 +375,13 @@ void draw_primary_tabs(WINDOW *win, Interface const *interface) {
     wmove(win, 1, 19);
     name = interface->selected_tab == TAB_ARPEGGIO ? "*ARP" : " ARP";
     wprintw(win, name);
+
+    attroff(COLOR_PAIR(UI_COLOR_BRIGHT));
 }
 
 void draw_secondary_tabs(WINDOW *win, Interface const *interface) {
+    attron(COLOR_PAIR(UI_COLOR_BRIGHT));
+
     if (interface->selected_tab != TAB_INSTRUMENT &&
         interface->selected_tab != TAB_WAVE &&
         interface->selected_tab != TAB_FILTER) {
@@ -393,6 +401,8 @@ void draw_secondary_tabs(WINDOW *win, Interface const *interface) {
     wmove(win, 2, 13);
     name = interface->selected_tab == TAB_FILTER ? "*FILT" : " FILT";
     wprintw(win, name);
+
+    attroff(COLOR_PAIR(UI_COLOR_BRIGHT));
 }
 
 void draw_filled_input_repr(WINDOW *win, Interface *interface, int draw_time) {
@@ -413,6 +423,7 @@ void clear_input_repr(Interface *interface) {
 }
 
 void draw_input_repr(WINDOW *win, Interface *interface, int draw_time) {
+    attron(COLOR_PAIR(UI_COLOR_GREY));
     if (interface->input_repr_printed_at != -1) {
         if (draw_time - interface->input_repr_printed_at < 600 &&
             interface->input_repr != NULL) {
@@ -425,6 +436,7 @@ void draw_input_repr(WINDOW *win, Interface *interface, int draw_time) {
             draw_filled_input_repr(win, interface, draw_time);
         }
     }
+    attroff(COLOR_PAIR(UI_COLOR_GREY));
 }
 
 void draw_layout(WINDOW *win, Interface *interface) {
@@ -634,4 +646,17 @@ void interface_handle_input(Interface *interface, Input const *input) {
 void interface_free(Interface *interface) {
     ref_list_free(interface->layouts);
     free(interface);
+}
+
+void init_colors(void) {
+    start_color();
+    init_pair(UI_COLOR_BLUE, COLOR_BLUE, COLOR_BLACK);
+    init_pair(UI_COLOR_GREEN, COLOR_GREEN, COLOR_BLACK);
+    init_pair(UI_COLOR_CYAN, COLOR_CYAN, COLOR_BLACK);
+    init_pair(UI_COLOR_RED, COLOR_RED, COLOR_BLACK);
+    init_pair(UI_COLOR_MAGENTA, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(UI_COLOR_YELLOW, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(UI_COLOR_WHITE, COLOR_WHITE, COLOR_BLACK);
+    init_pair(UI_COLOR_GREY, 8, COLOR_BLACK);
+    init_pair(UI_COLOR_BRIGHT, 15, COLOR_BLACK);
 }

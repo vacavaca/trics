@@ -70,8 +70,7 @@ int main(int argc, char *argv[]) {
     win = initscr();
     enable_raw_mode();
     curs_set(0);
-    start_color();
-    init_pair(1, COLOR_YELLOW, COLOR_BLACK);
+    init_colors();
 
     int t = 0;
     while (true) {
@@ -84,20 +83,9 @@ int main(int argc, char *argv[]) {
             }
 
             interface_handle_input(interface, &input);
-            // size_t repr_len = strlen(repr);
-            // if (repr_len > 0) {
-            //     last_write = i;
-            //     wclear(win);
-            // }
-            // wmove(win, 15, 25 - repr_len);
-            // attron(COLOR_PAIR(1));
-            // wprintw(win, repr);
-            // attroff(COLOR_PAIR(1));
         }
 
         interface_draw(win, interface, t * REFRESH_RATE_MSEC);
-        wmove(win, 25, 1);
-        wprintw(win, "%d", t * REFRESH_RATE_MSEC);
         wrefresh(win);
         t += 1;
     }

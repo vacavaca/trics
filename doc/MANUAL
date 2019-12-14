@@ -1,82 +1,85 @@
 
-		 ____  ____  ____  ___  ____
-		(_  _)(  _ \(_  _)/ __)/ _ _)
-	  	  )(  )    / _)(_( (__ \__  \
-	 	 (__) (_)\_)(____)\___)(____/
+              ____  ____  ____  ___  ____
+             (_  _)(  _ \(_  _)/ __)/ _ _)
+               )(  )    / _)(_( (__ \__  \
+              (__) (_)\_)(____)\___)(____/
 
-    	    Mighty tiny text-based chiptune tracker                    
+         Mighty tiny text-based chiptune tracker                    
 
 
- 	  	     Command Line Interface
+                 Command Line Interface
 
 Usage
 
-	trics <command> [<args>]
+    trics [command] [<args>]
+
+  Without any argument trics will open song editor, but you will not 
+  be able to save your song, so consider adding -o option. 
 
 Default command
 
-  trics [options] <song_file>
+  trics [options] [song_file]
 
-  	song_file       - song file to open
+      song_file       - song file to open
 
   Options:
-  	-o output_file        - Output song file
-  	--midi device         - Connect MIDI input device
-  	--mc cc param         - Map MIDI controll to parameter
-  	-s                    - Play song without displaying interface
-  	-h, --help            - Show this help
-  	-v, --version         - Show version
+      -o output_file        - Output song file
+      --midi device         - Connect MIDI input device
+      --mc cc param         - Map MIDI controll to parameter
+      -s                    - Play song without displaying interface
+      -h, --help            - Show this help
+      -v, --version         - Show version
 
 Available commands
 
-  midi-list
-  export
+  midi-list       - show list of available midi devices
+  export          - export song as an audio file
 
 
-	   	        Keyboard Layout
+                     Keyboard Layout
 
 Default mode
 
   hjkl or arrow                  - move cursor
-  CTRL + hl or CTRL + arrow	 - switch tab
+  CTRL + hl or CTRL + arrow     - switch tab
   or mouse click 
 
-  ALT + hl or ALT + arrow   	 - switch sub tab
+  ALT + hl or ALT + arrow        - switch sub tab
   or mouse click
   CTRL + jk or CTRL + arrow      - move cursor one screen up/down
   ALT + jk or ALT + arrow        - move cursor to the first/last row
   SPACE or mouse click           - edit mode
   CTRL + SPACE                   - play from selection or stop
   CTRL + r                       - start / stop recording
- 				  (in pattern tab, with focus in track)
+                                   (in pattern tab, with focus in track)
   y                              - copy bar/pattern/table row
   p                              - paste bar/pattern/table row
   s                              - save song
 
 Edit mode
 
-  jk or arrow keys 
+  jk or arrow keys               - move parameter one step up/down
   or mouse grab 
-  or mouse scroll      		 - move parameter one step up/down
+  or mouse scroll               
   CTRL + jk or arrow keys        - move parameter by octave 
-				   (12 steps up/down)
+                                   (12 steps up/down)
   ALT + jk or arrow keys         - double/half parameter
   ENTER                          - exit from edit mode saving changes 
- 				   (where no auto exit)
+                                   (where no auto exit)
   ESC or SPACE                   - exit from edit mode discarding changes
-				   (where no auto exit)
+                                   (where no auto exit)
 
 
-                   	  Notes Layout
+                       Notes Layout
 
-		  _ _   _ _ _   _ _   _ _ _
-		 |s|d| |g|h|j| |2|3| |5|6|7|
-	 	 |_|_| |_|_|_| |_|_| |_|_|_| _
-		|z|x|c|v|b|n|m|q|w|e|r|t|y|u|i|
-		|_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|
+                _ _   _ _ _   _ _   _ _ _
+               |s|d| |g|h|j| |2|3| |5|6|7|
+               |_|_| |_|_|_| |_|_| |_|_|_| _
+              |z|x|c|v|b|n|m|q|w|e|r|t|y|u|i|
+              |_|_|_|_|_|_|_|_|_|_|_|_|_|_|_|
 
 
-			   Interface
+                        Interface
 
 Number format
 
@@ -88,25 +91,49 @@ Number format
 
   Different parameters may have different maximum and minimum allowed values.
 
+Modes
+  Trics has three modes of operation "default", "edit" and "record". 
+
+  In the default mode you can navigate around and play notes on the currently
+  selected instrument. You also can play instrument on top of the song as a kind
+  of solo.
+
+  In the edit mode you program parameter and notes values. To switch to the 
+  edit mode select a parameter and press SPACE or just click the parameter with
+  your mouse.
+
+  In the record mode you can play notes on the selected instrument
+  and if the song is playing trics will record all the notes you've typed in 
+  the selected pattern. When you start recording notes and your pattern is not 
+  presetnted in any slot of the currently played bar, trics will place it
+  to the first empty slot of the bar in the song arrangement table.
+  Notes are recorded only to the first voice of the pattern. If the pattern
+  already contains some notes in the first voice column they will be
+  overwritten.
+  To switch to the record mode do not forget to select pattern and instrument
+  and when you're ready press CTRL + r, to exit the record mode press 
+  CTRL + r again. When the record mode is active the pattern table and 
+  the pattern tab title will become red.
+
 Song arrangement tab
- __________________________
- |                          |
- | *SONG  PATT  INST  ARP   | <---- Tabs
- |                          |
- |  bp st title             | <---- Main song parameters:
- |  80 10 Song Title lol... |         bp - BPM (tempo)
- |                          |         st - Steps, number of steps in a pattern
- |  00 -- 03 01 -- 03 ff r4 | --        title - Song title
- |  00 -- 03 01 -- 03 ff r4 |  |
- |  00 -- 03 01 -- 03 ff r4 |  |
- |  00 -- 03 01 -- 03 ff r4 |  |--- Pattern arrangement table
- |  00 -- 03 01 -- 03 ff r4 |  |    enter pattern numbers here
- |  00 -- 03 01 -- 03 ff r4 |  |    to arrange your song
- |  01 43 -- -- -- -- -- -- |  | 
- |> 01 43 -- -- -- -- -- -- | --
- |                          |
- |  ...            CTRL + h | <---- Shows pressed keys and mouse events
- |__________________________|
+  ___________________________
+ |                           |
+ | *SONG  PATT  INST  ARP    | <---- Tabs
+ |                           |
+ |  bp st title              | <---- Main song parameters:
+ |  80 10 Song Title lol...  |         bp - BPM (tempo)
+ |                           |         st - Steps, number of steps in a pattern
+ |  00 -- 03 01 -- 03 ff r4  | --        title - Song title
+ |  00 -- 03 01 -- 03 ff r4  |  |
+ |  00 -- 03 01 -- 03 ff r4  |  |
+ |  00 -- 03 01 -- 03 ff r4  |  |--- Pattern arrangement table
+ |  00 -- 03 01 -- 03 ff r4  |  |    enter pattern numbers here
+ |  00 -- 03 01 -- 03 ff r4  |  |    to arrange your song
+ |  01 43 -- -- -- -- -- --  |  | 
+ |> 01 43 -- -- -- -- -- --  | --
+ |                           |
+ |  ...            CTRL + h  | <---- Shows pressed keys and mouse events
+ |__________________________ |
  
  ">" Shows currently played bar  
  
@@ -228,7 +255,7 @@ Arpeggio tab
 ```
 
 
-	       	 	Default template
+                      Default template
 
 Instruments
 

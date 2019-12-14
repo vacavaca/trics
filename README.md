@@ -19,8 +19,21 @@
 ![Screenshot](/doc/screenshot.png)
 
 
-License
-=======
+## Features
+
+* Up to 256 instruments
+* Up to 256 bars per song (~ 8:30 at 120 bpm)
+* 16 instruments in a song + 1 solo can be played simultaneously
+* Step based arpeggios, filter and wave form modulation
+* Wide and deep instruments sound with 4 voices played unison
+* Mouse and keyboard controls
+* MIDI input and parameter mapping
+* Stereo output
+
+Inspired by sound and design of the MOS Technology's SID chips.
+
+
+## License
 GNU General Public License v3.0
 
 See [COPYING](COPYING) for the full text.

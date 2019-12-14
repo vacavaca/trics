@@ -17,7 +17,7 @@
 #define MAX_PATTERN_LENGTH 64
 #define MAX_PATTERN_VOICES 2
 #define MAX_TRACKS 8
-#define MAX_SONG_LENGTH 512
+#define MAX_SONG_LENGTH 256
 #define EMPTY 0
 #define NONE -1
 

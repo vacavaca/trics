@@ -14,6 +14,19 @@
 #define MAX_TABLE_COLUMNS 8
 #define REFRESH_RATE_MSEC 8
 
+typedef enum
+{
+    UI_COLOR_BLUE=1,
+    UI_COLOR_GREEN,
+    UI_COLOR_CYAN,
+    UI_COLOR_RED,
+    UI_COLOR_MAGENTA,
+    UI_COLOR_YELLOW,
+    UI_COLOR_WHITE,
+    UI_COLOR_GREY,
+    UI_COLOR_BRIGHT
+} Color;
+
 typedef struct {
     size_t item_size;
     int cap;
@@ -94,5 +107,7 @@ void interface_draw(WINDOW *win, Interface *interface, int draw_time);
 void interface_handle_input(Interface *interface, Input const *input);
 
 void interface_fee(Interface *interface);
+
+void init_colors(void);
 
 #endif // UI_H
