@@ -4,12 +4,15 @@ on: [push]
 
 jobs:
   build:
+     strategy:
+      matrix:
+        platform: [ubuntu-latest]
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform }}
     
     steps:
-    - name: setup
-      run: apt install libncurses5-dev
+    - name: Install libncurses5-dev
+      run: sudo apt install libncurses5-dev
 
     - uses: actions/checkout@v1
     - name: make
