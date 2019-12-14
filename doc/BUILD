@@ -3,7 +3,7 @@ Building trics
 
 Requirements:
 
-    make, gcc, libncurses-dev
+    make, gcc, libncurses5-dev
 
 Set-up:
 

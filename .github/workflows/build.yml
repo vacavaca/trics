@@ -1,4 +1,4 @@
-name: Build
+name: build
 
 on: [push]
 
@@ -8,6 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: setup
+      run: apt install libncurses5-dev
+
     - uses: actions/checkout@v1
     - name: make
       run: make
