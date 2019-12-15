@@ -175,7 +175,8 @@ double segment_distance_to(Point *const start, Point *const end,
     Point o = orthogonal(&s);
 
     if (sign(dot(&stp, &s)) != sign(dot(&etp, &s))) {
-        return abs(dot(&stp, &o) / length(&o));
+        double l = (double)dot(&stp, &o) / length(&o);
+        return l * sign(l);
     } else {
         double sl = length(&stp);
         double el = length(&etp);
@@ -184,7 +185,6 @@ double segment_distance_to(Point *const start, Point *const end,
 }
 
 double rect_distance_to(Rect const *rect, Point const *point) {
-
     Point a = (Point){
         .x = rect->x,
         .y = rect->y,

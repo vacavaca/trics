@@ -303,6 +303,71 @@ void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
     }
 }
 
+void control_table_focus_first(ControlTable *table) {
+    table->focus_row = 0;
+    if (table->focus != NULL) {
+        control_focus_clear(table->focus);
+    } else {
+        table->focus_column = 0;
+    }
+
+    Control *row = ref_list_get(table->rows, table->focus_row);
+    table->focus = &row[table->focus_column];
+    control_focus(table->focus);
+}
+
+void control_table_focus_last(ControlTable *table) {
+    table->focus_row = table->rows->length - 1;
+    if (table->focus != NULL) {
+        control_focus_clear(table->focus);
+    } else {
+        table->focus_column = 0;
+    }
+
+    Control *row = ref_list_get(table->rows, table->focus_row);
+    table->focus = &row[table->focus_column];
+    control_focus(table->focus);
+}
+
+bool control_table_focus_first_col(ControlTable *table, int y) {
+    bool find = false;
+    double min_d;
+    int row_n = 0;
+    Control *focus;
+
+    for (int i = 0; i < table->rows->length; i++) {
+        Control *row = ref_list_get(table->rows, i);
+        Control *control = &row[0];
+        Point point = (Point){.x = control->rect.x, .y = y};
+        double d = rect_distance_to(&control->rect, &point);
+        if (!find || d < min_d) {
+            min_d = d;
+            focus = control;
+            find = true;
+            row_n = i;
+
+            if (d == 0.0) {
+                i = table->rows->length; // break outer
+                break;
+            }
+        }
+    }
+
+    if (table->focus != NULL && table->focus != focus) {
+        control_focus_clear(table->focus);
+    }
+
+    if (focus == NULL) {
+        return false;
+    }
+
+    table->focus = focus;
+    table->focus_row = row_n;
+    table->focus_column = 0;
+    control_focus(focus);
+    return true;
+}
+
 // returns false if cursor leaves table while jump
 // must always return true when jump = false
 bool control_table_focus_add(ControlTable *table, int x, int y,
@@ -485,12 +550,69 @@ void layout_focus_clear(Layout *layout) {
 }
 
 void layout_focus_first(Layout *layout) {
+    ControlTable *focus = layout->focus;
+    if (focus == NULL) {
+        bool find = false;
+        int min_x;
+        int min_y;
+
+        for (int i = 0; i < layout->tables->length; i++) {
+            ControlTable *table = ref_list_get(layout->tables, i);
+            if (!find || table->rect.x < min_x || table->rect.y < min_y) {
+                min_x = table->rect.x;
+                min_y = table->rect.y;
+                focus = table;
+                find = true;
+            }
+        }
+    }
+
+    control_table_focus_first(focus);
+    layout->focus = focus;
 }
 
 void layout_focus_last(Layout *layout) {
+    ControlTable *focus = layout->focus;
+    if (focus == NULL) {
+        bool find = false;
+        int min_x;
+        int min_y;
+
+        for (int i = 0; i < layout->tables->length; i++) {
+            ControlTable *table = ref_list_get(layout->tables, i);
+            if (!find || table->rect.x < min_x || table->rect.y < min_y) {
+                min_x = table->rect.x;
+                min_y = table->rect.y;
+                focus = table;
+                find = true;
+            }
+        }
+    }
+
+    control_table_focus_last(focus);
+    layout->focus = focus;
 }
 
 void layout_focux_first_col_or_same(Layout *layout, int x, int y) {
+    ControlTable *focus = NULL;
+    for (int i = 0; i < layout->tables->length; i++) {
+        ControlTable *table = ref_list_get(layout->tables, i);
+        if (x >= table->rect.x && x <= table->rect.x + table->rect.width &&
+            y >= table->rect.y && y <= table->rect.y + table->rect.height) {
+            focus = table;
+            break;
+        }
+    }
+
+    if (layout->focus != NULL && layout->focus != focus) {
+        layout_focus_clear(layout);
+    }
+
+    if (layout->focus == NULL && focus != NULL) {
+        if (control_table_focus_first_col(focus, y)) {
+            layout->focus = focus;
+        }
+    }
 }
 
 // if not exact find closest
@@ -498,8 +620,8 @@ void layout_focus_point(Layout *layout, int x, int y, bool exact) {
     ControlTable *focus = NULL;
     for (int i = 0; i < layout->tables->length; i++) {
         ControlTable *table = ref_list_get(layout->tables, i);
-        if (x >= table->rect.x && x < table->rect.x + table->rect.width &&
-            y >= table->rect.y && y < table->rect.y + table->rect.height) {
+        if (x >= table->rect.x && x <= table->rect.x + table->rect.width &&
+            y >= table->rect.y && y <= table->rect.y + table->rect.height) {
             focus = table;
             break;
         }
@@ -540,7 +662,7 @@ void layout_focus_add(Layout *layout, int x, int y, bool jump) {
     } else {
         Cursor cursor;
         bool can_focus = control_table_focus_add(layout->focus, x, y,
-                                             jump, &cursor);
+                                                 jump, &cursor);
         if (can_focus && cursor.jump) {
             bool find = false;
             int min_d;
@@ -1210,7 +1332,7 @@ bool handle_edge_focus(Interface *interface, Input const *input) {
     const Input test_down = input_init_modified_special(MODIFIER_KEY_ALT,
                                                         SPECIAL_KEY_DOWN);
     if (input_eq(input, &test_j) || input_eq(input, &test_down)) {
-        focus_first(interface);
+        focus_last(interface);
         return true;
     }
 
@@ -1218,7 +1340,7 @@ bool handle_edge_focus(Interface *interface, Input const *input) {
     const Input test_up = input_init_modified_special(MODIFIER_KEY_ALT,
                                                       SPECIAL_KEY_UP);
     if (input_eq(input, &test_k) || input_eq(input, &test_up)) {
-        focus_last(interface);
+        focus_first(interface);
         return true;
     }
 
@@ -1245,7 +1367,7 @@ bool handle_wheel_focus(Interface *interface, Input const *input) {
 
 bool handle_mouse_focus(Interface *interface, Input const *input) {
     if (input_mouse_event_eq(input, MOUSE_EVENT_PRESS, MOUSE_BUTTON)) {
-        focus_point(interface, input->mouse.point.x, input->mouse.point.y, false);
+        focus_point(interface, input->mouse.point.x - 1, input->mouse.point.y, false);
         // TODO enable editing
         return true;
     }
