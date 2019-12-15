@@ -239,6 +239,7 @@ ControlTable *control_table_init(int column_count, int x, int y, int width,
         .focus = NULL,
         .focus_row = 0,
         .focus_column = 0,
+        .offset = 0,
     };
 
     return table;
@@ -295,11 +296,29 @@ void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
         }
     }
 
+    int header_offset = table->headers != NULL ? 1 : 0;
     for (int i = 0; i < table->rows->length; i++) {
         Control *row = ref_list_get(table->rows, i);
         for (int j = 0; j < table->column_count; j++) {
-            control_draw(win, &row[j], draw_time);
+            Control *control = &row[j];
+            control->rect.y = i - table->offset + table->rect.y + header_offset;
+            if (i >= table->offset && i < table->offset + MAX_TABLE_VISIBLE_ROWS) {
+                control_draw(win, &row[j], draw_time);
+            }
         }
+    }
+
+    bool offset_positive = table->offset > 0;
+    bool offset_above_end = (table->offset + MAX_TABLE_VISIBLE_ROWS) <
+                            table->rows->length;
+    if (offset_positive) {
+        wmove(win, 15, 1);
+        wprintw(win, "^");
+    }
+
+    if (offset_above_end) {
+        wmove(win, 15, 2);
+        wprintw(win, "...");
     }
 }
 
@@ -311,6 +330,7 @@ void control_table_focus_first(ControlTable *table) {
         table->focus_column = 0;
     }
 
+    table->offset = 0;
     Control *row = ref_list_get(table->rows, table->focus_row);
     table->focus = &row[table->focus_column];
     control_focus(table->focus);
@@ -324,6 +344,8 @@ void control_table_focus_last(ControlTable *table) {
         table->focus_column = 0;
     }
 
+    table->offset = table->rows->length - MAX_TABLE_VISIBLE_ROWS - 1;
+    table->offset = table->rows->length - 1 - MAX_TABLE_VISIBLE_ROWS;
     Control *row = ref_list_get(table->rows, table->focus_row);
     table->focus = &row[table->focus_column];
     control_focus(table->focus);
@@ -381,6 +403,7 @@ bool control_table_focus_add(ControlTable *table, int x, int y,
         table->focus = control;
         table->focus_row = 0;
         table->focus_column = 0;
+        table->offset = 0;
         control_focus(control);
         *cursor = (Cursor){.x = control->rect.x, .y = control->rect.y};
         return true;
@@ -440,6 +463,12 @@ bool control_table_focus_add(ControlTable *table, int x, int y,
     control_focus_clear(table->focus);
     Control *controls = ref_list_get(table->rows, focus_row);
     Control *control = &controls[focus_column];
+
+    if (focus_row - table->offset >= MAX_TABLE_VISIBLE_ROWS) {
+        table->offset = focus_row - MAX_TABLE_VISIBLE_ROWS + 1;
+    } else if (focus_row - table->offset < 0) {
+        table->offset = focus_row;
+    }
 
     table->focus = control;
     table->focus_row = focus_row;
@@ -747,7 +776,7 @@ ControlTable *init_song_arrangement_table(Layout *layout, Song *const song) {
         return NULL;
     }
 
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 16; i++) {
         Control arrangement_row[8] = {
             control_init_int(&song->patterns[i][0]),
             control_init_int(&song->patterns[i][1]),
