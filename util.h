@@ -2,6 +2,7 @@
 #define UTIL_H
 
 #include <stdbool.h> // bool
+#include "math.h" // sqrt
 
 int sign(int a);
 
@@ -19,9 +20,13 @@ typedef struct {
 
 bool rect_contains(Rect const *rect, Point const *point);
 
+double length(Point const *point);
+
 bool rect_intersects_ray(Rect const *rect, Point const *origin, Point const *ray);
 
 bool rect_ray_intersection(Rect const *rect, Point const *origin,
                            Point const *ray, Point *inter);
+
+double rect_distance_to(Rect const * rect, Point const * point);
 
 #endif //UTIL_H

@@ -14,7 +14,7 @@
 #define MAX_TEXT_WIDTH 24
 #define MAX_TABLE_COLUMNS 8
 #define REFRESH_RATE_MSEC 32
-#define CURSOR_BLINK_RATE_MSEC 500
+#define CURSOR_BLINK_RATE_MSEC 250
 #define INPUT_REPR_HIDE_DELAY 600
 
 typedef enum
@@ -64,6 +64,8 @@ typedef struct
     RefList *rows;
     Rect rect;
     Control* focus;
+    int focus_row;
+    int focus_column;
 } ControlTable;
 
 typedef enum {

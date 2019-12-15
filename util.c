@@ -1,5 +1,10 @@
 #include "util.h"
 
+typedef struct {
+    double x;
+    double y;
+} DPoint;
+
 int sign(int a) {
     return a > 0 ? 1 : (a < 0 ? -1 : 0);
 }
@@ -16,7 +21,7 @@ Point orthogonal(Point const *point) {
     };
 }
 
-Point negate(Point const *point) {
+Point neg(Point const *point) {
     return (Point){
         .x = -point->x,
         .y = -point->y,
@@ -30,15 +35,53 @@ Point add(Point const *point, Point const *other) {
     };
 }
 
+Point mul(Point const *point, double f) {
+    return (Point){
+        .x = point->x * f,
+        .y = point->y * f,
+    };
+}
+
 int dot(Point const *point, Point const *other) {
     return point->x * other->x + point->y * other->y;
 }
 
+int cross(Point const *point, Point const *other) {
+    return point->x * other->y - point->y * other->x;
+}
+
+double length(Point const *point) {
+    return sqrt((double)dot(point, point));
+}
+
 bool ray_intersects_segment(Point const *ray,
                             Point const *start, Point const *end) {
-    Point o = orthogonal(&ray);
+    Point o = orthogonal(ray);
 
-    return sign(dot(&start, &o)) != sign(dot(&end, &o));
+    return sign(dot(start, &o)) != sign(dot(end, &o));
+}
+
+bool ray_segment_intersection(Point const *ray, Point const *start,
+                              Point const *end, DPoint *inter) {
+    Point nstart = neg(start);
+    Point s = add(end, &nstart);
+
+    double dv = ((double)cross(ray, &s));
+    if (dv == 0) {
+        return false; // parallel
+    }
+
+    double t = ((double)cross(start, &s)) / dv;
+    if (t <= 0) {
+        return false; // no intersection
+    }
+
+    *inter = (DPoint){
+        .x = t * ray->x,
+        .y = t * ray->y,
+    };
+
+    return true;
 }
 
 bool rect_intersects_ray(Rect const *rect,
@@ -73,29 +116,14 @@ bool rect_intersects_ray(Rect const *rect,
         .y = local_rect.y + local_rect.height,
     };
 
-    return ray_intersects_segment(&ray, &a, &b) ||
-           ray_intersects_segment(&ray, &b, &c) ||
-           ray_intersects_segment(&ray, &c, &d) ||
-           ray_intersects_segment(&ray, &d, &a);
-}
-
-bool ray_segment_intersection(Point const *ray, Point const *start,
-                              Point const *end, Point *inter) {
-    Point o = orthogonal(&ray);
-
-    if (sign(dot(&start, &o)) == sign(dot(&end, &o))) {
-        return false;
-    }
-
-    
+    return ray_intersects_segment(ray, &a, &b) ||
+           ray_intersects_segment(ray, &b, &c) ||
+           ray_intersects_segment(ray, &c, &d) ||
+           ray_intersects_segment(ray, &d, &a);
 }
 
 bool rect_ray_intersection(Rect const *rect, Point const *origin,
                            Point const *ray, Point *inter) {
-    if (!rect_intersects_ray(rect, origin, ray)) {
-        return false;
-    }
-
     Rect local_rect = (Rect){
         .x = rect->x - origin->x,
         .y = rect->y - origin->y,
@@ -121,4 +149,79 @@ bool rect_ray_intersection(Rect const *rect, Point const *origin,
         .x = local_rect.x,
         .y = local_rect.y + local_rect.height,
     };
+
+    DPoint di;
+    if (ray_segment_intersection(ray, &a, &b, &di) ||
+        ray_segment_intersection(ray, &b, &c, &di) ||
+        ray_segment_intersection(ray, &c, &d, &di) ||
+        ray_segment_intersection(ray, &d, &a, &di)) {
+        *inter = (Point){
+            .x = (int)(round(di.x + origin->x)),
+            .y = (int)(round(di.y + origin->y))};
+        return true;
+    }
+
+    return false;
+}
+
+double segment_distance_to(Point *const start, Point *const end,
+                           Point const *point) {
+    Point nstart = neg(start);
+    Point nend = neg(end);
+    Point s = add(end, &nstart);
+
+    Point stp = add(point, &nstart);
+    Point etp = add(point, &nend);
+    Point o = orthogonal(&s);
+
+    if (sign(dot(&stp, &s)) != sign(dot(&etp, &s))) {
+        return abs(dot(&stp, &o) / length(&o));
+    } else {
+        double sl = length(&stp);
+        double el = length(&etp);
+        return sl < el ? sl : el;
+    }
+}
+
+double rect_distance_to(Rect const *rect, Point const *point) {
+
+    Point a = (Point){
+        .x = rect->x,
+        .y = rect->y,
+    };
+
+    Point b = (Point){
+        .x = rect->x + rect->width,
+        .y = rect->y,
+    };
+
+    Point c = (Point){
+        .x = rect->x + rect->width,
+        .y = rect->y + rect->height,
+    };
+
+    Point d = (Point){
+        .x = rect->x,
+        .y = rect->y + rect->height,
+    };
+
+    double min_d = segment_distance_to(&a, &b, point);
+    double ds;
+
+    ds = segment_distance_to(&b, &c, point);
+    if (ds < min_d) {
+        min_d = ds;
+    }
+
+    ds = segment_distance_to(&c, &d, point);
+    if (ds < min_d) {
+        min_d = ds;
+    }
+
+    ds = segment_distance_to(&d, &a, point);
+    if (ds < min_d) {
+        min_d = ds;
+    }
+
+    return min_d;
 }

@@ -26,6 +26,7 @@
 * 16 instruments in a song + 1 solo can be played simultaneously
 * Step based arpeggios, filter and wave form modulation
 * Wide and deep instruments sound with 4 voices played unison
+* Delay and Reverb
 * Mouse and keyboard controls
 * MIDI input and parameter mapping
 * Stereo output
