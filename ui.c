@@ -74,33 +74,49 @@ Control control_init_bool(volatile bool *const value) {
     return (Control){
         .type = CONTROL_TYPE_BOOL,
         .bool_value = value,
-        .width = 2};
+        .focus = false,
+        .rect = (Rect){
+            .x = 0,
+            .y = 0,
+            .width = 2,
+            .height = 1,
+        }};
 }
 
 Control control_init_int(volatile int *const value) {
     return (Control){
         .type = CONTROL_TYPE_INT,
         .int_value = value,
-        .width = 2};
+        .focus = false,
+        .rect = (Rect){
+            .x = 0,
+            .y = 0,
+            .width = 2,
+            .height = 1}};
 }
 
 Control control_init_text(char *const value, int width) {
     return (Control){
         .type = CONTROL_TYPE_TEXT,
         .text_value = value,
-        .width = width};
+        .focus = false,
+        .rect = (Rect){
+            .x = 0,
+            .y = 0,
+            .width = width,
+            .height = 1}};
 }
 
 void control_draw_bool(WINDOW *win, Control const *control) {
-    wmove(win, control->y, control->x);
+    wmove(win, control->rect.y, control->rect.x);
     wprintw(win, "%2x", (*control->bool_value ? 255 : 0));
 }
 
 void control_draw_int(WINDOW *win, Control const *control) {
-    wmove(win, control->y, control->x);
+    wmove(win, control->rect.y, control->rect.x);
     int value = *control->int_value;
     if (value != EMPTY) {
-        wprintw(win, "%02x", *control->int_value);
+        wprintw(win, "%02x", *control->int_value - 1);
     } else {
         wprintw(win, "--");
     }
@@ -111,21 +127,38 @@ void control_draw_text(WINDOW *win, Control const *control) {
     char display_text[MAX_TEXT_WIDTH];
 
     memcpy(display_text, control->text_value, MAX_TEXT_WIDTH);
-    if (len > control->width) {
-        display_text[control->width] = '\0';
-        display_text[control->width - 1] = '.';
-        display_text[control->width - 2] = '.';
-        display_text[control->width - 3] = '.';
+    if (len > control->rect.width) {
+        display_text[control->rect.width] = '\0';
+        display_text[control->rect.width - 1] = '.';
+        display_text[control->rect.width - 2] = '.';
+        display_text[control->rect.width - 3] = '.';
     }
 
-    wmove(win, control->y, control->x);
+    if (len == 0) {
+        display_text[0] = ' ';
+        display_text[1] = '\0';
+    }
+
+    wmove(win, control->rect.y, control->rect.x);
     wprintw(win, display_text);
 }
 
-void control_draw(WINDOW *win, Control const *control) {
-    attron(COLOR_PAIR(UI_COLOR_BRIGHT));
-    // attron(COLOR_PAIR(UI_COLOR_INVERSE));
-    // attron(A_BOLD);
+void control_draw(WINDOW *win, Control *control, int draw_time) {
+    int color;
+    if (control->focus) {
+        if (draw_time - control->focused_at < CURSOR_BLINK_RATE_MSEC) {
+            color = UI_COLOR_INVERSE;
+        } else if (draw_time - control->focused_at > CURSOR_BLINK_RATE_MSEC * 2) {
+            control->focused_at = draw_time;
+            color = UI_COLOR_INVERSE;
+        } else {
+            color = UI_COLOR_BRIGHT;
+        }
+    } else {
+        color = UI_COLOR_BRIGHT;
+    }
+
+    attron(COLOR_PAIR(color));
     if (control->type == CONTROL_TYPE_BOOL) {
         control_draw_bool(win, control);
     } else if (control->type == CONTROL_TYPE_INT) {
@@ -133,10 +166,24 @@ void control_draw(WINDOW *win, Control const *control) {
     } else if (control->type == CONTROL_TYPE_TEXT) {
         control_draw_text(win, control);
     }
-    attroff(COLOR_PAIR(UI_COLOR_BRIGHT));
-    // attroff(A_BOLD);
-    // attroff(COLOR_PAIR(UI_COLOR_INVERSE));
+
+    attroff(COLOR_PAIR(color));
 }
+
+void control_focus(Control *control) {
+    control->focus = true;
+    control->focused_at = -1;
+}
+
+void control_clear_focus(Control *control) {
+    control->focus = false;
+}
+
+typedef struct {
+    int x;
+    int y;
+    bool jump;
+} Cursor;
 
 ControlTable *control_table_init(int column_count, int x, int y, int width,
                                  char const **headers) {
@@ -176,9 +223,13 @@ ControlTable *control_table_init(int column_count, int x, int y, int width,
         .headers = table_headers,
         .column_count = column_count,
         .rows = list,
-        .x = x,
-        .y = y,
-        .width = width};
+        .rect = (Rect){
+            .x = x,
+            .y = y,
+            .width = width,
+            .height = (table_headers != NULL ? 1 : 0),
+        },
+        .focus = NULL};
 
     return table;
 
@@ -206,9 +257,9 @@ bool control_table_add(ControlTable *table, Control const *row) {
     int y_offset = table->headers != NULL ? 1 : 0;
     int x_offset = 0;
     for (int i = 0; i < table->column_count; i++) {
-        table_row[i].y = table->y + y_offset + table->rows->length;
-        table_row[i].x = table->x + x_offset;
-        x_offset += table_row[i].width + 1;
+        table_row[i].rect.y = table->rect.y + y_offset + table->rows->length;
+        table_row[i].rect.x = table->rect.x + x_offset;
+        x_offset += table_row[i].rect.width + 1;
     }
 
     if (!ref_list_add(table->rows, table_row)) {
@@ -216,18 +267,20 @@ bool control_table_add(ControlTable *table, Control const *row) {
         return false;
     }
 
+    table->rect.height += 1;
+
     return true;
 }
 
-void control_table_draw(WINDOW *win, ControlTable const *table) {
+void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
     if (table->headers != NULL) {
         int offset = 0;
         Control *first_row = ref_list_get(table->rows, 0);
         for (int i = 0; i < table->column_count; i++) {
-            int x = table->x + offset;
-            offset += first_row[i].width + 1;
+            int x = table->rect.x + offset;
+            offset += first_row[i].rect.width + 1;
 
-            wmove(win, table->y, x);
+            wmove(win, table->rect.y, x);
             wprintw(win, table->headers[i]);
         }
     }
@@ -235,9 +288,20 @@ void control_table_draw(WINDOW *win, ControlTable const *table) {
     for (int i = 0; i < table->rows->length; i++) {
         Control *row = ref_list_get(table->rows, i);
         for (int j = 0; j < table->column_count; j++) {
-            control_draw(win, &row[j]);
+            control_draw(win, &row[j], draw_time);
         }
     }
+}
+
+// returns false if cursor leaves table while jump
+// must always return true when jump = false
+Cursor control_table_focus_add(ControlTable *table, int x, int y, bool jump) {
+}
+
+void control_table_focus_point(ControlTable *table, int x, int y, bool exact) {
+}
+
+void control_table_focus_clear(ControlTable *table) {
 }
 
 void control_table_free(ControlTable *table) {
@@ -261,7 +325,8 @@ Layout *layout_init(void) {
     Layout *layout = malloc(sizeof(Layout));
 
     *layout = (Layout){
-        .tables = tables};
+        .tables = tables,
+        .focus = NULL};
 
     return layout;
 }
@@ -270,10 +335,71 @@ bool layout_add_table(Layout *layout, ControlTable *table) {
     return ref_list_add(layout->tables, table);
 }
 
-void layout_draw(WINDOW *win, Layout const *layout) {
+void layout_draw(WINDOW *win, Layout const *layout, int draw_time) {
     for (int i = 0; i < layout->tables->length; i++) {
-        control_table_draw(win, ref_list_get(layout->tables, i));
+        control_table_draw(win, ref_list_get(layout->tables, i), draw_time);
     }
+}
+
+void layout_focus_first(Layout *layout) {
+}
+
+void layout_focus_last(Layout *layout) {
+}
+
+void layout_focus_some(Layout *layout, int x, int y) {
+}
+
+// if not exact find closest
+void layout_focus_point(Layout *layout, int x, int y, bool exact) {
+}
+
+void layout_focus_add(Layout *layout, int x, int y, bool jump) {
+    if (layout->focus == NULL) {
+        bool find = false;
+        int min_x;
+        int min_y;
+        ControlTable *focus = NULL;
+
+        for (int i = 0; i < layout->tables->length; i++) {
+            ControlTable *table = ref_list_get(layout->tables, i);
+            if (!find || table->rect.x < min_x || table->rect.y < min_y) {
+                min_x = table->rect.x;
+                min_y = table->rect.y;
+                focus = table;
+                find = true;
+            }
+        }
+
+        layout->focus = focus;
+        control_table_focus_add(layout->focus, x, y, false);
+    } else {
+        Cursor cursor = control_table_focus_add(layout->focus, x, y, jump);
+        if (cursor.jump) {
+            control_table_focus_clear(layout->focus);
+
+            bool find = false;
+            int min_x;
+            int min_y;
+            ControlTable *focus = NULL;
+
+            for (int i = 0; i < layout->tables->length; i++) {
+                ControlTable *table = ref_list_get(layout->tables, i);
+            }
+
+            layout->focus = focus;
+            control_table_focus_point(focus, cursor.x, cursor.y, false);
+        }
+    }
+}
+
+void layout_focus_clear(Layout *layout) {
+    ControlTable *table = layout->focus;
+    if (table != NULL) {
+        control_table_focus_clear(table);
+    }
+
+    layout->focus = NULL;
 }
 
 void layout_free(Layout *layout) {
@@ -345,7 +471,7 @@ ControlTable *init_song_arrangement_table(Layout *layout, Song *const song) {
     return arrangement_table;
 }
 
-Layout* init_song_layout(Song *const song) {
+Layout *init_song_layout(Song *const song) {
     Layout *layout = layout_init();
     if (layout == NULL) {
         return NULL;
@@ -409,7 +535,9 @@ Interface *interface_init(Song *const song) {
         .layouts = layouts,
         .input_repr = NULL,
         .input_repr_length = 0,
-        .input_repr_printed_at = -1};
+        .input_repr_printed_at = -1,
+        .focus = NULL,
+        .focus_control = NULL};
 
     if (!init_layouts(interface, song)) {
         ref_list_free(layouts);
@@ -493,7 +621,7 @@ void clear_input_repr(Interface *interface) {
 void draw_input_repr(WINDOW *win, Interface *interface, int draw_time) {
     attron(COLOR_PAIR(UI_COLOR_GREY));
     if (interface->input_repr_printed_at != -1) {
-        if (draw_time - interface->input_repr_printed_at < 600 &&
+        if (draw_time - interface->input_repr_printed_at < INPUT_REPR_HIDE_DELAY &&
             interface->input_repr != NULL) {
             draw_filled_input_repr(win, interface, draw_time);
         } else {
@@ -507,10 +635,10 @@ void draw_input_repr(WINDOW *win, Interface *interface, int draw_time) {
     attroff(COLOR_PAIR(UI_COLOR_GREY));
 }
 
-void draw_layout(WINDOW *win, Interface *interface) {
+void draw_layout(WINDOW *win, Interface *interface, int draw_time) {
     Layout const *layout = ref_list_get(interface->layouts, interface->selected_tab);
     if (layout != NULL) {
-        layout_draw(win, layout);
+        layout_draw(win, layout, draw_time);
     }
 }
 
@@ -519,7 +647,7 @@ void interface_draw(WINDOW *win, Interface *interface, int draw_time) {
     draw_primary_tabs(win, interface);
     draw_secondary_tabs(win, interface);
     draw_input_repr(win, interface, draw_time);
-    draw_layout(win, interface);
+    draw_layout(win, interface, draw_time);
 }
 
 Tab get_selected_primary_tab(Interface *interface) {
@@ -644,8 +772,8 @@ bool handle_mouse_tab_switch(Interface *interface, Input const *input) {
         return false;
     }
 
-    const int x = input->mouse.x;
-    const int y = input->mouse.y;
+    const int x = input->mouse.point.x;
+    const int y = input->mouse.point.y;
 
     const Tab primary_tab = get_selected_primary_tab(interface);
     const Tab selected_tab = interface->selected_tab;
@@ -725,6 +853,207 @@ bool handle_quick_tab(Interface *interface, Input const *input) {
     return false;
 }
 
+void update_focus_control(Interface *interface) {
+    Layout *layout = interface->focus;
+    if (layout == NULL) {
+        interface->focus_control = NULL;
+        return;
+    }
+
+    ControlTable *table = layout->focus;
+    if (table == NULL) {
+        interface->focus_control = NULL;
+        return;
+    }
+
+    interface->focus_control = table->focus;
+}
+
+void focus_first(Interface *interface) {
+    Layout *focus_layout = ref_list_get(interface->layouts, interface->selected_tab);
+    if (focus_layout != interface->focus) {
+        if (interface->focus != NULL) {
+            layout_focus_clear(interface->focus);
+        }
+        interface->focus = focus_layout;
+    }
+
+    if (interface->focus != NULL) {
+        layout_focus_first(interface->focus);
+    }
+    update_focus_control(interface);
+}
+
+void focus_last(Interface *interface) {
+    Layout *focus_layout = ref_list_get(interface->layouts, interface->selected_tab);
+    if (focus_layout != interface->focus) {
+        if (interface->focus != NULL) {
+            layout_focus_clear(interface->focus);
+        }
+        interface->focus = focus_layout;
+    }
+
+    if (interface->focus != NULL) {
+        layout_focus_last(interface->focus);
+    }
+    update_focus_control(interface);
+}
+
+void focus_some(Interface *interface, int x, int y) {
+    Layout *focus_layout = ref_list_get(interface->layouts, interface->selected_tab);
+    if (focus_layout != interface->focus) {
+        if (interface->focus != NULL) {
+            layout_focus_clear(interface->focus);
+        }
+        interface->focus = focus_layout;
+    }
+
+    if (interface->focus != NULL) {
+        layout_focus_some(interface->focus, x, y);
+    }
+    update_focus_control(interface);
+}
+
+void focus_point(Interface *interface, int x, int y, bool exact) {
+    Layout *focus_layout = ref_list_get(interface->layouts, interface->selected_tab);
+    if (focus_layout != interface->focus) {
+        if (interface->focus != NULL) {
+            layout_focus_clear(interface->focus);
+        }
+        interface->focus = focus_layout;
+    }
+
+    if (interface->focus != NULL) {
+        layout_focus_point(interface->focus, x, y, exact);
+    }
+    update_focus_control(interface);
+}
+
+void focus_add(Interface *interface, int x, int y, bool jump) {
+    Layout *focus_layout = ref_list_get(interface->layouts, interface->selected_tab);
+    if (focus_layout != interface->focus) {
+        if (interface->focus != NULL) {
+            layout_focus_clear(interface->focus);
+        }
+        interface->focus = focus_layout;
+    }
+
+    if (interface->focus != NULL) {
+        layout_focus_add(interface->focus, x, y, jump);
+    }
+    update_focus_control(interface);
+}
+
+bool handle_step_focus(Interface *interface, Input const *input) {
+    const Input test_h = input_init_key('h');
+    const Input test_left = input_init_special(SPECIAL_KEY_LEFT);
+    if (input_eq(input, &test_h) || input_eq(input, &test_left)) {
+        focus_add(interface, 0, -1, true);
+        return true;
+    }
+
+    const Input test_j = input_init_key('j');
+    const Input test_down = input_init_special(SPECIAL_KEY_DOWN);
+    if (input_eq(input, &test_j) || input_eq(input, &test_down)) {
+        focus_add(interface, 1, 0, true);
+        return true;
+    }
+
+    const Input test_k = input_init_key('k');
+    const Input test_up = input_init_special(SPECIAL_KEY_UP);
+    if (input_eq(input, &test_k) || input_eq(input, &test_up)) {
+        focus_add(interface, -1, 0, true);
+        return true;
+    }
+
+    const Input test_l = input_init_key('l');
+    const Input test_right = input_init_special(SPECIAL_KEY_RIGHT);
+    if (input_eq(input, &test_l) || input_eq(input, &test_right)) {
+        focus_add(interface, 0, 1, true);
+        return true;
+    }
+
+    return false;
+}
+
+bool handle_screen_focus(Interface *interface, Input const *input) {
+    const Input test_j = input_init_modified_key(MODIFIER_KEY_CTRL, 'j');
+    const Input test_down = input_init_modified_special(MODIFIER_KEY_CTRL,
+                                                        SPECIAL_KEY_DOWN);
+    if (input_eq(input, &test_j) || input_eq(input, &test_down)) {
+        focus_add(interface, 8, 0, false);
+        return true;
+    }
+
+    const Input test_k = input_init_modified_key(MODIFIER_KEY_CTRL, 'k');
+    const Input test_up = input_init_modified_special(MODIFIER_KEY_CTRL,
+                                                      SPECIAL_KEY_UP);
+    if (input_eq(input, &test_k) || input_eq(input, &test_up)) {
+        focus_add(interface, -8, 0, false);
+        return true;
+    }
+
+    return false;
+}
+
+bool handle_edge_focus(Interface *interface, Input const *input) {
+    const Input test_j = input_init_modified_key(MODIFIER_KEY_ALT, 'j');
+    const Input test_down = input_init_modified_special(MODIFIER_KEY_ALT,
+                                                        SPECIAL_KEY_DOWN);
+    if (input_eq(input, &test_j) || input_eq(input, &test_down)) {
+        focus_first(interface);
+        return true;
+    }
+
+    const Input test_k = input_init_modified_key(MODIFIER_KEY_ALT, 'k');
+    const Input test_up = input_init_modified_special(MODIFIER_KEY_ALT,
+                                                      SPECIAL_KEY_UP);
+    if (input_eq(input, &test_k) || input_eq(input, &test_up)) {
+        focus_last(interface);
+        return true;
+    }
+
+    return false;
+}
+
+bool handle_wheel_focus(Interface *interface, Input const *input) {
+    if (input_mouse_event_eq(input, MOUSE_EVENT_PRESS,
+                             MOUSE_BUTTON_WHEEL_UP)) {
+        focus_some(interface, input->mouse.point.x, input->mouse.point.y);
+        focus_add(interface, 0, -1, false);
+        return true;
+    }
+
+    if (input_mouse_event_eq(input, MOUSE_EVENT_PRESS,
+                             MOUSE_BUTTON_WHEEL_DOWN)) {
+        focus_some(interface, input->mouse.point.x, input->mouse.point.y);
+        focus_add(interface, 0, 1, false);
+        return true;
+    }
+
+    return false;
+}
+
+bool handle_focus(Interface *interface, Input const *input) {
+    if (handle_step_focus(interface, input)) {
+        return true;
+    }
+
+    if (handle_screen_focus(interface, input)) {
+        return true;
+    }
+
+    if (handle_edge_focus(interface, input)) {
+        return true;
+    }
+
+    if (handle_wheel_focus(interface, input)) {
+        return true;
+    }
+
+    return false;
+}
+
 bool try_handle_input(Interface *interface, Input const *input) {
     if (handle_key_tab_switch(interface, input)) {
         return true;
@@ -735,6 +1064,10 @@ bool try_handle_input(Interface *interface, Input const *input) {
     }
 
     if (handle_quick_tab(interface, input)) {
+        return true;
+    }
+
+    if (handle_focus(interface, input)) {
         return true;
     }
 

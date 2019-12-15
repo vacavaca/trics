@@ -190,8 +190,9 @@ bool parse_navigation(char const *keys, Input *input) {
                 .type = INPUT_TYPE_MOUSE,
                 .mouse.button = button,
                 .mouse.event = event,
-                .mouse.x = x,
-                .mouse.y = y};
+                .mouse.point = (Point){
+                    .x = x,
+                    .y = y}};
             return 1;
         } else if (b == 64 || b == 65) {
             MouseEvent event = MOUSE_EVENT_PRESS;
@@ -202,8 +203,9 @@ bool parse_navigation(char const *keys, Input *input) {
                 .type = INPUT_TYPE_MOUSE,
                 .mouse.button = button,
                 .mouse.event = event,
-                .mouse.x = x,
-                .mouse.y = y};
+                .mouse.point = (Point){
+                    .x = x,
+                    .y = y}};
             return true;
         }
     }
@@ -317,7 +319,7 @@ char *input_repr(Input const *input) {
         }
 
         char pos[8];
-        sprintf(pos, "%d %d", input->mouse.x, input->mouse.y);
+        sprintf(pos, "%d %d", input->mouse.point.x, input->mouse.point.y);
         repr_concat(&repr, pos);
     }
 
@@ -355,7 +357,8 @@ bool input_eq(Input const *a, Input const *b) {
             return false;
         }
 
-        return a->mouse.x == b->mouse.x && a->mouse.y == b->mouse.y;
+        return a->mouse.point.x == b->mouse.point.x &&
+               a->mouse.point.y == b->mouse.point.y;
     }
 }
 

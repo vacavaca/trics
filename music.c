@@ -86,7 +86,9 @@ Song *song_init(char const *name) {
         return NULL;
     }
 
-    *song = (Song){.bpm = 128, .step = 16};
+    *song = (Song){
+        .bpm = INT_PARAM(128),
+        .step = INT_PARAM(16)};
 
     int len = strlen(name);
     song->name = malloc(len + 1);

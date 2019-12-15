@@ -39,7 +39,6 @@ Available commands
                      Keyboard Layout
 
 General
-  arrow or h/j/k/l               - move cursor
   CTRL + arrow or CTRL + h/l     - switch tab
   or mouse click 
 
@@ -52,17 +51,18 @@ General
   ALT + w                        - go to wave tab
   ALT + f                        - go to filter tab
   ALT + a                        - go to arpeggio tab
-  CTRL + arrow or CTRL + j/k     - move cursor one screen up/down
-  ALT + arrow or ALT + j/k       - move cursor to the first/last row
-  mouse wheel                    - scroll table
-  y                              - copy bar/pattern/table row
-  p                              - paste bar/pattern/table row
+  y                              - copy table row/pattern/instrument/arpeggio
+  p                              - paste table row/pattern/instrument/arpeggio
   CTRL + c                       - quit
 
-Default mode
+Default and record mode
+  arrow or h/j/k/l               - move cursor
+  CTRL + arrow or CTRL + j/k     - move cursor one screen up/down
+  ALT + arrow or ALT + j/k       - move cursor to the first/last row
   SPACE or mouse click           - edit mode
   CTRL + SPACE                   - play from selection or stop
   CTRL + r                       - start / stop recording
+  mouse wheel                    - scroll table
 
 Edit mode
   arrow or j/k                   - move parameter one step up/down

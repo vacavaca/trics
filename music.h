@@ -21,6 +21,8 @@
 #define EMPTY 0
 #define NONE -1
 
+#define INT_PARAM(n) (n + 1)
+
 _Static_assert(sizeof(int) == 4, "Never gonna give you up");
 
 typedef enum {
@@ -39,12 +41,12 @@ typedef struct {
     volatile bool ring_mod;
     volatile bool hard_sync;
 
-    Operator pulse_width_operator;
+    volatile Operator pulse_width_operator;
     volatile int pulse_width;
 } WaveStep;
 
 typedef struct {
-    WaveStep steps[MAX_WAVE_STEPS];
+    volatile WaveStep steps[MAX_WAVE_STEPS];
     volatile bool repeat;
     volatile int step;
     volatile int length;
@@ -65,7 +67,7 @@ typedef struct {
 } FilterStep;
 
 typedef struct {
-    FilterStep steps[MAX_FILTER_STEP];
+    volatile FilterStep steps[MAX_FILTER_STEP];
     volatile bool repeat;
     volatile int step;
     volatile int length;
@@ -100,7 +102,7 @@ typedef struct {
 
 typedef struct {
     char *name;
-    ArpeggioStep steps[MAX_ARPEGGIO_STEPS];
+    volatile ArpeggioStep steps[MAX_ARPEGGIO_STEPS];
     volatile bool repeat;
     volatile int step;
     volatile int length;
@@ -118,7 +120,8 @@ typedef struct {
 
 typedef struct {
     volatile int length;
-    Step steps[MAX_PATTERN_LENGTH][MAX_PATTERN_VOICES];
+    volatile int octaves[MAX_PATTERN_VOICES];
+    volatile Step steps[MAX_PATTERN_LENGTH][MAX_PATTERN_VOICES];
 } Pattern;
 
 typedef struct {

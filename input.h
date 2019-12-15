@@ -1,6 +1,7 @@
 #ifndef INPUT_H
 #define INPUT_H
 
+#include "util.h"    // Point
 #include <poll.h>    // poll
 #include <stdbool.h> // bool
 #include <stdio.h>   //sprintf
@@ -53,8 +54,7 @@ typedef struct {
         struct {
             MouseEvent event;
             MouseButton button;
-            int x;
-            int y;
+            Point point;
         } mouse;
     };
 } Input;

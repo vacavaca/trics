@@ -3,6 +3,7 @@
 
 #include "input.h"   // Input
 #include "music.h"   // Song
+#include "util.h"    // Rect, sign
 #include <assert.h>  // assert
 #include <ncurses.h> // wmove wprintw
 #include <stdbool.h> // bool
@@ -12,7 +13,9 @@
 #define DEFAULT_LIST_CAPACITY 64
 #define MAX_TEXT_WIDTH 24
 #define MAX_TABLE_COLUMNS 8
-#define REFRESH_RATE_MSEC 8
+#define REFRESH_RATE_MSEC 32
+#define CURSOR_BLINK_RATE_MSEC 500
+#define INPUT_REPR_HIDE_DELAY 600
 
 typedef enum
 {
@@ -41,15 +44,6 @@ typedef enum {
     CONTROL_TYPE_TEXT
 } ControlType;
 
-typedef enum {
-    DECOR_NONE,
-    DECOR_BOLD,
-    DECOR_REC,
-    DECOR_ROW_MARK,
-    DECOR_TAB_MARK,
-    DECOR_INVERT,
-} Decor;
-
 typedef struct
 {
     ControlType type;
@@ -58,11 +52,9 @@ typedef struct
         volatile int *const int_value;
         char *const text_value;
     };
-    bool focusable;
-    Decor decor;
-    int x;
-    int y;
-    int width;
+    Rect rect;
+    bool focus;
+    int focused_at;
 } Control;
 
 typedef struct
@@ -70,9 +62,8 @@ typedef struct
     char **headers;
     int column_count;
     RefList *rows;
-    int x;
-    int y;
-    int width;
+    Rect rect;
+    Control* focus;
 } ControlTable;
 
 typedef enum {
@@ -86,6 +77,7 @@ typedef enum {
 
 typedef struct {
     RefList *tables;
+    ControlTable* focus;
 } Layout;
 
 const Tab PRIMARY_TABS[4];
@@ -99,6 +91,8 @@ typedef struct
     char *input_repr;
     int input_repr_length;
     int input_repr_printed_at;
+    Layout* focus;
+    Control* focus_control;
 } Interface;
 
 Interface *interface_init(Song *song);
