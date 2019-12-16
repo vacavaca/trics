@@ -1,0 +1,35 @@
+{
+   ncurses_term_leak
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:newterm
+   fun:initscr
+   fun:main
+}
+{
+   ncurses_refresh_leak
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:wrefresh
+   fun:main
+}
+{
+   ncurses_start_color_leak
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:start_color
+   fun:init_colors
+   fun:main
+}
+{
+   ncurses_wprintw_leak
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:wprintw
+   ...
+   fun:main
+}

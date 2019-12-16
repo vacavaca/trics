@@ -129,7 +129,7 @@ void control_draw_text(WINDOW *win, Control const *control) {
     const int len = strlen(control->text_value);
     char display_text[MAX_TEXT_WIDTH];
 
-    memcpy(display_text, control->text_value, MAX_TEXT_WIDTH);
+    memcpy(display_text, control->text_value, len + 1);
     if (len > control->rect.width) {
         display_text[control->rect.width] = '\0';
         display_text[control->rect.width - 1] = '.';
@@ -205,7 +205,7 @@ ControlTable *control_table_init(int column_count, int x, int y, int width,
     char **table_headers = NULL;
     int i = 0;
     if (headers != NULL) {
-        table_headers = malloc(sizeof(char *));
+        table_headers = malloc(sizeof(char *) * column_count);
         if (table_headers == NULL) {
             goto cleanup_list;
         }
@@ -536,10 +536,12 @@ void control_table_free(ControlTable *table) {
     for (int i = 0; i < table->rows->length; i++) {
         free(table->rows->array[i]);
     }
-    for (int i = 0; i < table->column_count; i++) {
-        free(table->headers[i]);
+    if (table->headers != NULL) {
+        for (int i = 0; i < table->column_count; i++) {
+            free(table->headers[i]);
+        }
+        free(table->headers);
     }
-    free(table->headers);
     ref_list_free(table->rows);
     free(table);
 }
@@ -729,6 +731,9 @@ void layout_focus_add(Layout *layout, int x, int y, bool jump) {
 }
 
 void layout_free(Layout *layout) {
+    for (int i = 0; i < layout->tables->length; i++) {
+        control_table_free(ref_list_get(layout->tables, i));
+    }
     ref_list_free(layout->tables);
     free(layout);
 }
@@ -937,7 +942,7 @@ void draw_filled_input_repr(WINDOW *win, Interface *interface, int draw_time) {
 
 void clear_input_repr(Interface *interface) {
     if (interface->input_repr != NULL) {
-        free(interface->input_repr);
+        input_repr_free(interface->input_repr);
         interface->input_repr = NULL;
     }
     interface->input_repr_length = 0;
@@ -1463,6 +1468,12 @@ void interface_handle_input(Interface *interface, Input const *input) {
 }
 
 void interface_free(Interface *interface) {
+    for (int i = 0; i < interface->layouts->length; i++) {
+        layout_free(ref_list_get(interface->layouts, i));
+    }
+    if (interface->input_repr != NULL) {
+        input_repr_free(interface->input_repr);
+    }
     ref_list_free(interface->layouts);
     free(interface);
 }

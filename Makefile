@@ -6,7 +6,7 @@ CFLAGS = -g -Wall -Wextra -Wpedantic \
           -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
           -Wredundant-decls -Wnested-externs -Wmissing-include-dirs
 
-.PHONY: default all clean
+.PHONY: default all clean run run-check
 
 default: $(TARGET)
 all: default
@@ -29,3 +29,17 @@ clean:
 	rm -f *.o
 	rm -f $(TARGET)
 	rm -rf bin
+
+run: default
+	./$(TARGET)
+
+run-check: default
+	valgrind \
+		--gen-suppressions=all \
+		--leak-check=full \
+		--show-leak-kinds=all \
+		--leak-check=full \
+		--log-file="bin/valgrind.log" \
+		--tool=memcheck \
+		--suppressions=ncurses.supp  \
+		$(TARGET)

@@ -10,6 +10,7 @@
 #include <unistd.h>  // read
 
 #define INPUT_BLOCK_SIZE 4
+#define INPUT_CAPACITY 4
 
 const char MODIFIER_KEY_CTRL;
 const char MODIFIER_KEY_ALT;
@@ -59,7 +60,6 @@ typedef struct {
     };
 } Input;
 
-
 Input input_init_key(char const ch);
 
 Input input_init_special(SpecialKey key);
@@ -68,9 +68,13 @@ Input input_init_modified_key(char modifier, char const ch);
 
 Input input_init_modified_special(char modifier, SpecialKey key);
 
-bool input_read(Input *input);
+Input *input_read(int *out_len);
+
+void free_input(Input* input);
 
 char *input_repr(Input const *input);
+
+void input_repr_free(char * repr);
 
 bool input_eq(Input const *a, Input const *b);
 

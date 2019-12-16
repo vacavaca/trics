@@ -105,7 +105,7 @@ void interface_draw(WINDOW *win, Interface *interface, int draw_time);
 
 void interface_handle_input(Interface *interface, Input const *input);
 
-void interface_fee(Interface *interface);
+void interface_free(Interface *interface);
 
 void init_colors(void);
 

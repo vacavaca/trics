@@ -73,22 +73,36 @@ int main(int argc, char *argv[]) {
     init_colors();
 
     int t = 0;
+    Input *inputs = NULL;
     while (true) {
         sleep_msec(REFRESH_RATE_MSEC);
 
-        Input input;
-        if (input_read(&input)) {
-            if (input.type == INPUT_TYPE_KEY && !input.key.special && input.key.modifier == MODIFIER_KEY_CTRL && input.key.ch == 'c') {
-                return 0;
+        int len = 0;
+        inputs = input_read(&len);
+
+        for (int i = 0; i < len; i++) {
+            Input input = inputs[i];
+            Input test = input_init_modified_key(MODIFIER_KEY_CTRL, 'c');
+            if (input_eq(&input, &test)) {
+                goto cleanup;
             }
 
             interface_handle_input(interface, &input);
         }
+
+        free_input(inputs);
+        inputs = NULL;
 
         interface_draw(win, interface, t * REFRESH_RATE_MSEC);
         wrefresh(win);
         t += 1;
     }
 
+cleanup:
+    if (inputs != NULL) {
+        free_input(inputs);
+    }
+    interface_free(interface);
+    song_free(song);
     return 0;
 }

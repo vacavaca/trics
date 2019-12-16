@@ -53,7 +53,7 @@ bool starts_with(char const *haystack, int len, char const *needle) {
     return needle[len] == 0;
 }
 
-int get_chars(char **keys) {
+char *read_chars(int *out_len) {
     struct pollfd fd = {
         .fd = 0,
         .events = POLLIN};
@@ -62,45 +62,52 @@ int get_chars(char **keys) {
     bool ready = false;
     size_t len = 0;
 
-    *keys = NULL;
+    *out_len = 0;
+    char *keys = NULL;
 
     while (!ready) {
         if (POLLIN == poll(&fd, 1, 0)) {
-            char tmp[INPUT_BLOCK_SIZE + 1];
+            char tmp[INPUT_BLOCK_SIZE + 1] = { 0 };
             const size_t read_size = read(0, tmp, INPUT_BLOCK_SIZE);
             if (read_size == 0) {
-                return 0;
+                return NULL;
             }
 
             tmp[INPUT_BLOCK_SIZE] = 0;
             len += read_size;
 
-            if (*keys == NULL) {
+            if (keys == NULL) {
                 ex = malloc(read_size + 1);
                 if (ex == NULL) {
-                    return 0;
+                    return NULL;
                 }
-                *keys = ex;
-                *keys[0] = 0;
+                keys = ex;
+                keys[0] = 0;
             } else {
-                ex = realloc(*keys, len + 1);
+                ex = realloc(keys, len + 1);
                 if (ex == NULL) {
-                    free(*keys);
-                    return 0;
+                    free(keys);
+                    return NULL;
                 }
-                *keys = ex;
+                keys = ex;
             }
 
-            strcat(*keys, tmp);
-            (*keys)[len] = 0;
+            strcat(keys, tmp);
+            keys[len] = 0;
             if (read_size < INPUT_BLOCK_SIZE) {
-                return len;
+                *out_len = len;
+                return keys;
             }
         } else
             break;
     }
 
-    return len;
+    *out_len = len;
+    return keys;
+}
+
+void free_chars(char *keys) {
+    free(keys);
 }
 
 bool parse_single(char key, Input *input) {
@@ -213,28 +220,62 @@ bool parse_navigation(char const *keys, Input *input) {
     return false;
 }
 
-bool parse(char const *keys, int len, Input *input) {
-    if (len == 1) {
-        return parse_single(keys[0], input);
-    } else if (len == 2) {
-        return parse_double(keys, input);
-    } else if (len == 3) {
-        return parse_arrows(keys, input);
-    } else if (len == 6) {
-        return parse_navigation(keys, input);
+int parse(char const *keys, int len, Input *input) {
+    if (len >= 6 && parse_navigation(keys, input)) {
+        return 6;
     }
 
-    return false;
+    if (len >= 3 && parse_arrows(keys, input)) {
+        return 3;
+    }
+
+    if (len >= 2 && parse_double(keys, input)) {
+        return 2;
+    }
+
+    if (parse_single(keys[0], input)) {
+        return 1;
+    }
+
+    return 0;
 }
 
-bool input_read(Input *input) {
-    char *keys;
+Input *input_read(int *out_len) {
+    *out_len = 0;
+
     int len;
-    if ((len = get_chars(&keys)) > 0) {
-        return parse(keys, len, input);
+    char *keys = read_chars(&len);
+
+    Input *input = NULL;
+    int cap = INPUT_CAPACITY;
+    for (int i = 0; i < len;) {
+        if (input == NULL) {
+            input = malloc(sizeof(Input) * cap);
+        } else if (*out_len >= cap) {
+            cap *= 2;
+            Input *ex = realloc(input, sizeof(Input) * cap);
+            if (ex == NULL) {
+                free(input);
+                *out_len = 0;
+                return NULL;
+            }
+
+            input = ex;
+        }
+
+        int parsed = parse(keys, i > len - 6 ? len - i : 6, &input[*out_len]);
+        if (parsed > 0) {
+            i += parsed;
+            *out_len += 1;
+        }
     }
 
-    return false;
+    free_chars(keys);
+    return input;
+}
+
+void free_input(Input *input) {
+    free(input);
 }
 
 typedef struct
@@ -324,6 +365,10 @@ char *input_repr(Input const *input) {
     }
 
     return repr.buffer;
+}
+
+void input_repr_free(char * repr) {
+    free(repr);
 }
 
 bool input_eq(Input const *a, Input const *b) {
