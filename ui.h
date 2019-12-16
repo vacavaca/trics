@@ -18,9 +18,8 @@
 #define CURSOR_BLINK_RATE_MSEC 250
 #define INPUT_REPR_HIDE_DELAY 600
 
-typedef enum
-{
-    UI_COLOR_BLUE=1,
+typedef enum {
+    UI_COLOR_BLUE = 1,
     UI_COLOR_GREEN,
     UI_COLOR_CYAN,
     UI_COLOR_RED,
@@ -51,11 +50,17 @@ typedef struct
     union {
         volatile bool *const bool_value;
         volatile int *const int_value;
-        char *const text_value;
+        char ** text_value;
+    };
+    union {
+        bool prev_bool_value;
+        int prev_int_value;
+        char **prev_text_value;
     };
     Rect rect;
     bool focus;
     int focused_at;
+    bool edit;
 } Control;
 
 typedef struct
@@ -64,7 +69,7 @@ typedef struct
     int column_count;
     RefList *rows;
     Rect rect;
-    Control* focus;
+    Control *focus;
     int focus_row;
     int focus_column;
     int offset;
@@ -81,7 +86,7 @@ typedef enum {
 
 typedef struct {
     RefList *tables;
-    ControlTable* focus;
+    ControlTable *focus;
 } Layout;
 
 const Tab PRIMARY_TABS[4];
@@ -95,8 +100,8 @@ typedef struct
     char *input_repr;
     int input_repr_length;
     int input_repr_printed_at;
-    Layout* focus;
-    Control* focus_control;
+    Layout *focus;
+    Control *focus_control;
 } Interface;
 
 Interface *interface_init(Song *song);

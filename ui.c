@@ -76,6 +76,7 @@ Control control_init_bool(volatile bool *const value) {
         .bool_value = value,
         .focus = false,
         .focused_at = -1,
+        .edit = false,
         .rect = (Rect){
             .x = 0,
             .y = 0,
@@ -90,6 +91,7 @@ Control control_init_int(volatile int *const value) {
         .int_value = value,
         .focus = false,
         .focused_at = -1,
+        .edit = false,
         .rect = (Rect){
             .x = 0,
             .y = 0,
@@ -97,12 +99,13 @@ Control control_init_int(volatile int *const value) {
             .height = 1}};
 }
 
-Control control_init_text(char *const value, int width) {
+Control control_init_text(char **const value, int width) {
     return (Control){
         .type = CONTROL_TYPE_TEXT,
         .text_value = value,
         .focus = false,
         .focused_at = -1,
+        .edit = false,
         .rect = (Rect){
             .x = 0,
             .y = 0,
@@ -126,7 +129,7 @@ void control_draw_int(WINDOW *win, Control const *control) {
 }
 
 void control_draw_text(WINDOW *win, Control const *control) {
-    const int len = strlen(control->text_value);
+    const int len = strlen((char *)control->text_value);
     char display_text[MAX_TEXT_WIDTH];
 
     memcpy(display_text, control->text_value, len + 1);
@@ -148,12 +151,12 @@ void control_draw_text(WINDOW *win, Control const *control) {
 
 void control_draw(WINDOW *win, Control *control, int draw_time) {
     int color;
-    if (control->focus) {
+    if (control->focus || control->edit) {
         if (control->focused_at == -1) {
             control->focused_at = draw_time;
         }
 
-        if (draw_time - control->focused_at < CURSOR_BLINK_RATE_MSEC) {
+        if (control->edit || draw_time - control->focused_at < CURSOR_BLINK_RATE_MSEC) {
             color = UI_COLOR_INVERSE;
         } else if (draw_time - control->focused_at > CURSOR_BLINK_RATE_MSEC * 2) {
             control->focused_at = draw_time;
@@ -163,6 +166,10 @@ void control_draw(WINDOW *win, Control *control, int draw_time) {
         }
     } else {
         color = UI_COLOR_BRIGHT;
+    }
+
+    if (control->edit) {
+        attron(A_BOLD);
     }
 
     attron(COLOR_PAIR(color));
@@ -175,6 +182,10 @@ void control_draw(WINDOW *win, Control *control, int draw_time) {
     }
 
     attroff(COLOR_PAIR(color));
+
+    if (control->edit) {
+        attroff(A_BOLD);
+    }
 }
 
 void control_focus(Control *control) {
@@ -184,6 +195,71 @@ void control_focus(Control *control) {
 
 void control_focus_clear(Control *control) {
     control->focus = false;
+    control->edit = false;
+}
+
+bool control_edit(Control *control) {
+    if (control->edit) {
+        return true;
+    }
+
+    if (control->type == CONTROL_TYPE_BOOL) {
+        control->prev_bool_value = *control->bool_value;
+    } else if (control->type == CONTROL_TYPE_INT) {
+        control->prev_int_value = *control->int_value;
+    } else if (control->type == CONTROL_TYPE_TEXT) {
+        size_t len = strlen((char *)control->text_value);
+        control->prev_text_value = malloc(len + 1);
+        if (control->prev_text_value != NULL) {
+            memcpy(control->prev_text_value, control->text_value, len + 1);
+        } else {
+            return false;
+        }
+    }
+
+    control->edit = true;
+    return true;
+}
+
+void control_save_edit(Control *control) {
+    if (!control->edit) {
+        return;
+    }
+
+    if (control->type == CONTROL_TYPE_TEXT &&
+        control->prev_text_value != NULL) {
+        free(control->prev_text_value);
+        control->prev_text_value = NULL;
+    }
+
+    control->edit = false;
+}
+
+void control_discard_edit(Control *control) {
+    if (!control->edit) {
+        return;
+    }
+
+    if (control->type == CONTROL_TYPE_BOOL) {
+        *control->bool_value = control->prev_bool_value;
+    } else if (control->type == CONTROL_TYPE_INT) {
+        *control->int_value = control->prev_int_value;
+    } else if (control->type == CONTROL_TYPE_TEXT) {
+        if (control->prev_text_value != NULL) {
+            free(control->text_value);
+            control->text_value = control->prev_text_value;
+            control->prev_text_value = NULL;
+        }
+    }
+
+    control->edit = false;
+}
+
+void control_free(Control *control) {
+    if (control->type == CONTROL_TYPE_TEXT &&
+        control->prev_text_value != NULL) {
+        free(control->prev_text_value);
+    }
 }
 
 typedef struct {
@@ -534,7 +610,11 @@ void control_table_focus_clear(ControlTable *table) {
 
 void control_table_free(ControlTable *table) {
     for (int i = 0; i < table->rows->length; i++) {
-        free(table->rows->array[i]);
+        Control *row = ref_list_get(table->rows, i);
+        for (int j = 0; j < table->column_count; j++) {
+            control_free(&row[j]);
+        }
+        free(row);
     }
     if (table->headers != NULL) {
         for (int i = 0; i < table->column_count; i++) {
@@ -764,7 +844,7 @@ ControlTable *init_song_params_table(Layout *layout, Song *const song) {
     Control song_param_controls[3] = {
         control_init_int(&song->bpm),
         control_init_int(&song->step),
-        control_init_text((char *const)song->name, 17),
+        control_init_text(song->name, 17),
     };
 
     if (!control_table_add(song_params_table, song_param_controls)) {
@@ -1309,6 +1389,42 @@ void focus_add(Interface *interface, int x, int y, bool jump) {
     update_focus_control(interface);
 }
 
+bool interface_is_editing(Interface const * interface) {
+    return interface->focus_control != NULL && interface->focus_control->edit;
+}
+
+bool interface_discard_edit(Interface *interface) {
+    if (interface->focus_control == NULL) {
+        return false;
+    }
+
+    control_discard_edit(interface->focus_control);
+    return true;
+}
+
+bool interface_edit(Interface *interface) {
+    if (interface->focus_control == NULL) {
+        return false;
+    }
+
+    if (interface->focus_control->edit) {
+        if (!interface_discard_edit(interface)) {
+            return false;
+        }
+    }
+
+    return control_edit(interface->focus_control);
+}
+
+bool interface_save_edit(Interface *interface) {
+    if (interface->focus_control == NULL) {
+        return false;
+    }
+
+    control_save_edit(interface->focus_control);
+    return true;
+}
+
 bool handle_step_focus(Interface *interface, Input const *input) {
     const Input test_h = input_init_key('h');
     const Input test_left = input_init_special(SPECIAL_KEY_LEFT);
@@ -1402,7 +1518,7 @@ bool handle_wheel_focus(Interface *interface, Input const *input) {
 bool handle_mouse_focus(Interface *interface, Input const *input) {
     if (input_mouse_event_eq(input, MOUSE_EVENT_PRESS, MOUSE_BUTTON)) {
         focus_point(interface, input->mouse.point.x - 1, input->mouse.point.y, false);
-        // TODO enable editing
+        interface_edit(interface);
         return true;
     }
 
@@ -1433,6 +1549,33 @@ bool handle_focus(Interface *interface, Input const *input) {
     return false;
 }
 
+bool handle_edit(Interface *interface, Input const *input) {
+    if (interface->focus_control == NULL) {
+        return false;
+    }
+
+    Input test = input_init_key(' ');
+    if (input_eq(input, &test)) {
+        if (!interface_is_editing(interface)) {
+            return interface_edit(interface);
+        } else {
+            return interface_save_edit(interface);
+        }
+    }
+
+    test = input_init_special(SPECIAL_KEY_ESC);
+    if (input_eq(input, &test)) {
+        return interface_discard_edit(interface);
+    }
+
+    test = input_init_special(SPECIAL_KEY_ENTER);
+    if (input_eq(input, &test)) {
+        return interface_save_edit(interface);
+    }
+
+    return false;
+}
+
 bool try_handle_input(Interface *interface, Input const *input) {
     if (handle_key_tab_switch(interface, input)) {
         return true;
@@ -1447,6 +1590,10 @@ bool try_handle_input(Interface *interface, Input const *input) {
     }
 
     if (handle_focus(interface, input)) {
+        return true;
+    }
+
+    if (handle_edit(interface, input)) {
         return true;
     }
 

@@ -25,6 +25,7 @@ Instrument *instrument_init(char const *name) {
         .filter = (Filter){.repeat = true, .step = 16}};
 
     int len = strlen(name);
+
     instrument->name = malloc(len + 1);
     if (instrument->name == NULL) {
         free(instrument);
@@ -76,7 +77,7 @@ Arpeggio *arpeggio_init(char const *name) {
 }
 
 void arpeggio_free(Arpeggio *arpeggio) {
-    free(arpeggio->name);
+    free(*arpeggio->name);
     free(arpeggio);
 }
 

@@ -344,7 +344,7 @@ char *input_repr(Input const *input) {
             }
         } else {
             if (input->key.ch == ' ') {
-                repr_concat(&repr, "WS");
+                repr_concat(&repr, "SPACE");
             } else {
                 repr_add(&repr, input->key.ch);
             }

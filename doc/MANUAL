@@ -73,7 +73,7 @@ Edit mode
   ALT + arrow or ALT + j/k       - double/half parameter
   ENTER                          - exit from edit mode saving changes 
                                    (where no auto exit)
-  ESC or SPACE                   - exit from edit mode discarding changes
+  ESC                            - exit from edit mode discarding changes
                                    (where no auto exit)
 
 Tip: If you accidentally hit CTRL + S press CTRL + Q to unfreeze your terminal emulator.
