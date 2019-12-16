@@ -4,7 +4,7 @@
                )(  )    / _)(_( (__ \__  \
               (__) (_)\_)(____)\___)(____/
 
-         Mighty tiny text-based chiptune tracker                    
+         Mighty tiny text-based chiptune tracker
 
 
                  Command Line Interface
@@ -13,8 +13,8 @@ Usage
 
     trics [command] [<args>]
 
-  Without any argument trics will open song editor, but you will not 
-  be able to save your song, so consider adding -o option. 
+  Without any argument trics will open song editor, but you will not
+  be able to save your song, so consider adding -o option.
 
 Default command
 
@@ -36,11 +36,11 @@ Available commands
   export          - export song as an audio file
 
 
-                     Keyboard Layout
+                    Keyboard Layout
 
 General
   CTRL + arrow or CTRL + h/l     - switch tab
-  or mouse click 
+  or mouse click
 
   ALT + arrow or ALT + h/l       - switch sub tab
   or mouse click
@@ -66,12 +66,12 @@ Default and record mode
 
 Edit mode
   arrow or j/k                   - move parameter one step up/down
-  or mouse wheel     
+  or mouse wheel
 
-  CTRL + arrow or CTRL + j/k     - move parameter by octave 
+  CTRL + arrow or CTRL + j/k     - move parameter by octave
                                    (12 steps up/down)
   ALT + arrow or ALT + j/k       - double/half parameter
-  ENTER                          - exit from edit mode saving changes 
+  ENTER                          - exit from edit mode saving changes
                                    (where no auto exit)
   ESC                            - exit from edit mode discarding changes
                                    (where no auto exit)
@@ -92,7 +92,7 @@ Tip: If you accidentally hit CTRL + S press CTRL + Q to unfreeze your terminal e
 
 Number format
 
-  In trics all numeric parameters are integers and in the interface 
+  In trics all numeric parameters are integers and in the interface
   they are represented as hex digits, for example: 80 in hex = 128 in dec.
 
   Minimum numeric value is 00
@@ -101,27 +101,27 @@ Number format
   Different parameters may have different maximum and minimum allowed values.
 
 Modes
-  Trics has three modes of operation "default", "edit" and "record". 
+  Trics has three modes of operation "default", "edit" and "record".
 
   In the default mode you can navigate around and play notes on the currently
   selected instrument. You also can play instrument on top of the song as a kind
   of solo.
 
-  In the edit mode you program parameter and notes values. To switch to the 
+  In the edit mode you program parameter and notes values. To switch to the
   edit mode select a parameter and press SPACE or just click the parameter with
   your mouse.
 
   In the record mode you can play notes on the selected instrument
-  and if the song is playing trics will record all the notes you've typed in 
-  the selected pattern. When you start recording notes and your pattern is not 
+  and if the song is playing trics will record all the notes you've typed in
+  the selected pattern. When you start recording notes and your pattern is not
   presetnted in any slot of the currently played bar, trics will place it
   to the first empty slot of the bar in the song arrangement table.
   Notes are recorded only to the first voice of the pattern. If the pattern
   already contains some notes in the first voice column they will be
   overwritten.
   To switch to the record mode do not forget to select pattern and instrument
-  and when you're ready press CTRL + r, to exit the record mode press 
-  CTRL + r again. When the record mode is active the pattern table and 
+  and when you're ready press CTRL + r, to exit the record mode press
+  CTRL + r again. When the record mode is active the pattern table and
   the pattern tab title will become red.
 
 Song arrangement tab
@@ -138,14 +138,14 @@ Song arrangement tab
  |  00 -- 03 01 -- 03 ff r4  |  |--- Pattern arrangement table
  |  00 -- 03 01 -- 03 ff r4  |  |    enter pattern numbers here
  |  00 -- 03 01 -- 03 ff r4  |  |    to arrange your song
- |  01 43 -- -- -- -- -- --  |  | 
+ |  01 43 -- -- -- -- -- --  |  |
  |> 01 43 -- -- -- -- -- --  | --
  |                           |
  |  ...            CTRL + h  | <---- Shows pressed keys and mouse events
  |__________________________ |
- 
- ">" Shows currently played bar  
- 
+
+ ">" Shows currently played bar
+
  "..." Indicates that there are more table rows hidden bellow or above.
 
 Pattern tab
@@ -187,11 +187,11 @@ Arpeggio tab
   ## name
   00 Lead synth
 
-  vl hr
-  ff 01
+  vl pn
+  ff 80
 
-  aa ad as ar ds da dr rv
-  00 00 00 00 00 00 00 00
+  hr aa ad as ar ds da dr
+  01 00 00 00 00 00 00 00
 
 
 
