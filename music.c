@@ -89,6 +89,7 @@ Song *song_init(char const *name) {
 
     *song = (Song){
         .bpm = INT_PARAM(128),
+        .name = NULL,
         .step = INT_PARAM(16)};
 
     int len = strlen(name);

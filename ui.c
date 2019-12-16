@@ -70,6 +70,28 @@ void ref_list_free(RefList *list) {
     free(list);
 }
 
+char *text_cut(char *str, int width, bool cut, bool ellipsis) {
+    const int len = strlen(str);
+    char *result = malloc(len + 1);
+
+    memcpy(result, str, len + 1);
+    if (cut && len > width) {
+        result[width] = '\0';
+        if (ellipsis) {
+            result[width - 1] = '.';
+            result[width - 2] = '.';
+            result[width - 3] = '.';
+        }
+    }
+
+    if (len == 0) {
+        result[0] = ' ';
+        result[1] = '\0';
+    }
+
+    return result;
+}
+
 Control control_init_bool(volatile bool *const value) {
     return (Control){
         .type = CONTROL_TYPE_BOOL,
@@ -113,40 +135,37 @@ Control control_init_text(char **const value, int width) {
             .height = 1}};
 }
 
-void control_draw_bool(WINDOW *win, Control const *control) {
-    wmove(win, control->rect.y, control->rect.x);
-    wprintw(win, "%2x", (*control->bool_value ? 255 : 0));
+char *control_repr_bool(Control const *control) {
+    char *str = malloc(3);
+    sprintf(str, "%02x", *control->bool_value);
+    return str;
 }
 
-void control_draw_int(WINDOW *win, Control const *control) {
-    wmove(win, control->rect.y, control->rect.x);
+char *control_repr_int(Control const *control) {
+    char *str = malloc(3);
     int value = *control->int_value;
     if (value != EMPTY) {
-        wprintw(win, "%02x", *control->int_value - 1);
+        sprintf(str, "%02x", value - 1);
     } else {
-        wprintw(win, "--");
+        sprintf(str, "--");
     }
+    return str;
 }
 
-void control_draw_text(WINDOW *win, Control const *control) {
-    const int len = strlen((char *)control->text_value);
-    char display_text[MAX_TEXT_WIDTH];
+char *control_repr_text(Control const *control, bool cut, bool ellipsis) {
+    return text_cut(*control->text_value, control->rect.width, cut, ellipsis);
+}
 
-    memcpy(display_text, control->text_value, len + 1);
-    if (len > control->rect.width) {
-        display_text[control->rect.width] = '\0';
-        display_text[control->rect.width - 1] = '.';
-        display_text[control->rect.width - 2] = '.';
-        display_text[control->rect.width - 3] = '.';
+char *control_repr(Control* control, bool cut, bool ellipsis) {
+    if (control->type == CONTROL_TYPE_BOOL) {
+        return control_repr_bool(control);
+    } else if (control->type == CONTROL_TYPE_INT) {
+        return control_repr_int(control);
+    } else if (control->type == CONTROL_TYPE_TEXT) {
+        return control_repr_text(control, cut, ellipsis);
     }
 
-    if (len == 0) {
-        display_text[0] = ' ';
-        display_text[1] = '\0';
-    }
-
-    wmove(win, control->rect.y, control->rect.x);
-    wprintw(win, display_text);
+    return NULL;
 }
 
 void control_draw(WINDOW *win, Control *control, int draw_time) {
@@ -156,9 +175,11 @@ void control_draw(WINDOW *win, Control *control, int draw_time) {
             control->focused_at = draw_time;
         }
 
-        if (control->edit || draw_time - control->focused_at < CURSOR_BLINK_RATE_MSEC) {
+        const int double_refresh_rate = CURSOR_BLINK_RATE_MSEC * 2;
+        if (control->edit ||
+            draw_time - control->focused_at < CURSOR_BLINK_RATE_MSEC) {
             color = UI_COLOR_INVERSE;
-        } else if (draw_time - control->focused_at > CURSOR_BLINK_RATE_MSEC * 2) {
+        } else if (draw_time - control->focused_at > double_refresh_rate) {
             control->focused_at = draw_time;
             color = UI_COLOR_INVERSE;
         } else {
@@ -173,12 +194,19 @@ void control_draw(WINDOW *win, Control *control, int draw_time) {
     }
 
     attron(COLOR_PAIR(color));
-    if (control->type == CONTROL_TYPE_BOOL) {
-        control_draw_bool(win, control);
-    } else if (control->type == CONTROL_TYPE_INT) {
-        control_draw_int(win, control);
-    } else if (control->type == CONTROL_TYPE_TEXT) {
-        control_draw_text(win, control);
+    wmove(win, control->rect.y, control->rect.x);
+
+    if (!control->edit) {
+        char *repr = control_repr(control, true, true);
+        wprintw(win, repr);
+        free(repr);
+    } else {
+        if (control->edit_value != NULL) {
+            char *repr = text_cut(control->edit_value, control->rect.width,
+                                  true, false);
+            wprintw(win, "%s", repr);
+            free(repr);
+        }
     }
 
     attroff(COLOR_PAIR(color));
@@ -195,6 +223,10 @@ void control_focus(Control *control) {
 
 void control_focus_clear(Control *control) {
     control->focus = false;
+    if (control->edit && control->edit_value != NULL) {
+        free(control->edit_value);
+        control->edit_value = NULL;
+    }
     control->edit = false;
 }
 
@@ -203,19 +235,7 @@ bool control_edit(Control *control) {
         return true;
     }
 
-    if (control->type == CONTROL_TYPE_BOOL) {
-        control->prev_bool_value = *control->bool_value;
-    } else if (control->type == CONTROL_TYPE_INT) {
-        control->prev_int_value = *control->int_value;
-    } else if (control->type == CONTROL_TYPE_TEXT) {
-        size_t len = strlen((char *)control->text_value);
-        control->prev_text_value = malloc(len + 1);
-        if (control->prev_text_value != NULL) {
-            memcpy(control->prev_text_value, control->text_value, len + 1);
-        } else {
-            return false;
-        }
-    }
+    control->edit_value = control_repr(control, false, false);
 
     control->edit = true;
     return true;
@@ -226,10 +246,37 @@ void control_save_edit(Control *control) {
         return;
     }
 
-    if (control->type == CONTROL_TYPE_TEXT &&
-        control->prev_text_value != NULL) {
-        free(control->prev_text_value);
-        control->prev_text_value = NULL;
+    if (control->edit_value != NULL) {
+        bool control_bool = control->type == CONTROL_TYPE_BOOL;
+        bool control_int = control->type == CONTROL_TYPE_INT;
+        if (control_bool || control_int) {
+            if (strcmp(control->edit_value,"--")) {
+                int value = strtol(control->edit_value, NULL, 16);
+                if (errno != EINVAL) {
+                    if (control_bool) {
+                        *control->bool_value = value + 1;
+                    } else {
+                        *control->int_value = value + 1;
+                    }
+                }
+            } else {
+                if (control_bool) {
+                    *control->bool_value = 0;
+                } else {
+                   *control->int_value = EMPTY;
+               }
+            }
+
+            free(control->edit_value);
+            control->edit_value = NULL;
+        } else if (control->type == CONTROL_TYPE_TEXT) {
+            int len = strlen(control->edit_value);
+            if (len == 0) {
+                memcpy(control->edit_value, " ", 2);
+            }
+            free(*control->text_value);
+            *control->text_value = control->edit_value;
+        }
     }
 
     control->edit = false;
@@ -240,25 +287,20 @@ void control_discard_edit(Control *control) {
         return;
     }
 
-    if (control->type == CONTROL_TYPE_BOOL) {
-        *control->bool_value = control->prev_bool_value;
-    } else if (control->type == CONTROL_TYPE_INT) {
-        *control->int_value = control->prev_int_value;
-    } else if (control->type == CONTROL_TYPE_TEXT) {
-        if (control->prev_text_value != NULL) {
-            free(control->text_value);
-            control->text_value = control->prev_text_value;
-            control->prev_text_value = NULL;
+    if (control->type == CONTROL_TYPE_TEXT) {
+        if (control->edit_value != NULL) {
+            free(control->edit_value);
         }
+        control->edit_value = NULL;
     }
 
     control->edit = false;
 }
 
 void control_free(Control *control) {
-    if (control->type == CONTROL_TYPE_TEXT &&
-        control->prev_text_value != NULL) {
-        free(control->prev_text_value);
+    if (control->edit_value != NULL) {
+        free(control->edit_value);
+        control->edit_value = NULL;
     }
 }
 
@@ -377,8 +419,10 @@ void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
         Control *row = ref_list_get(table->rows, i);
         for (int j = 0; j < table->column_count; j++) {
             Control *control = &row[j];
-            control->rect.y = i - table->offset + table->rect.y + header_offset;
-            if (i >= table->offset && i < table->offset + MAX_TABLE_VISIBLE_ROWS) {
+            control->rect.y = i - table->offset + table->rect.y +
+                              header_offset;
+            if (i >= table->offset &&
+                i < table->offset + MAX_TABLE_VISIBLE_ROWS) {
                 control_draw(win, &row[j], draw_time);
             }
         }
@@ -844,7 +888,7 @@ ControlTable *init_song_params_table(Layout *layout, Song *const song) {
     Control song_param_controls[3] = {
         control_init_int(&song->bpm),
         control_init_int(&song->step),
-        control_init_text(song->name, 17),
+        control_init_text(&song->name, 17),
     };
 
     if (!control_table_add(song_params_table, song_param_controls)) {
@@ -897,19 +941,19 @@ Layout *init_song_layout(Song *const song) {
         goto cleanup_song_table;
     }
 
-    ControlTable *arrangement_table = init_song_arrangement_table(layout, song);
-    if (arrangement_table == NULL) {
+    ControlTable *arrangement = init_song_arrangement_table(layout, song);
+    if (arrangement == NULL) {
         goto cleanup_song_table;
     }
 
-    if (!layout_add_table(layout, arrangement_table)) {
+    if (!layout_add_table(layout, arrangement)) {
         goto cleanup_arrangement_table;
     }
 
     return layout;
 
 cleanup_arrangement_table:
-    control_table_free(arrangement_table);
+    control_table_free(arrangement);
 cleanup_song_table:
     control_table_free(params_table);
 cleanup_layout:
@@ -1032,7 +1076,8 @@ void clear_input_repr(Interface *interface) {
 void draw_input_repr(WINDOW *win, Interface *interface, int draw_time) {
     attron(COLOR_PAIR(UI_COLOR_GREY));
     if (interface->input_repr_printed_at != -1) {
-        if (draw_time - interface->input_repr_printed_at < INPUT_REPR_HIDE_DELAY &&
+        const int repr_printed_at = interface->input_repr_printed_at;
+        if (draw_time - repr_printed_at < INPUT_REPR_HIDE_DELAY &&
             interface->input_repr != NULL) {
             draw_filled_input_repr(win, interface, draw_time);
         } else {
@@ -1047,7 +1092,8 @@ void draw_input_repr(WINDOW *win, Interface *interface, int draw_time) {
 }
 
 void draw_layout(WINDOW *win, Interface *interface, int draw_time) {
-    Layout const *layout = ref_list_get(interface->layouts, interface->selected_tab);
+    Layout const *layout = ref_list_get(interface->layouts,
+                                        interface->selected_tab);
     if (layout != NULL) {
         layout_draw(win, layout, draw_time);
     }
@@ -1315,7 +1361,8 @@ void update_focus_control(Interface *interface) {
 }
 
 void focus_first(Interface *interface) {
-    Layout *focus_layout = ref_list_get(interface->layouts, interface->selected_tab);
+    Layout *focus_layout = ref_list_get(interface->layouts,
+                                        interface->selected_tab);
     if (focus_layout != interface->focus) {
         if (interface->focus != NULL) {
             layout_focus_clear(interface->focus);
@@ -1330,7 +1377,8 @@ void focus_first(Interface *interface) {
 }
 
 void focus_last(Interface *interface) {
-    Layout *focus_layout = ref_list_get(interface->layouts, interface->selected_tab);
+    Layout *focus_layout = ref_list_get(interface->layouts,
+                                        interface->selected_tab);
     if (focus_layout != interface->focus) {
         if (interface->focus != NULL) {
             layout_focus_clear(interface->focus);
@@ -1345,7 +1393,8 @@ void focus_last(Interface *interface) {
 }
 
 void focus_first_col_or_same(Interface *interface, int x, int y) {
-    Layout *focus_layout = ref_list_get(interface->layouts, interface->selected_tab);
+    Layout *focus_layout = ref_list_get(interface->layouts,
+                                        interface->selected_tab);
     if (focus_layout != interface->focus) {
         if (interface->focus != NULL) {
             layout_focus_clear(interface->focus);
@@ -1360,7 +1409,8 @@ void focus_first_col_or_same(Interface *interface, int x, int y) {
 }
 
 void focus_point(Interface *interface, int x, int y, bool exact) {
-    Layout *focus_layout = ref_list_get(interface->layouts, interface->selected_tab);
+    Layout *focus_layout = ref_list_get(interface->layouts,
+                                        interface->selected_tab);
     if (focus_layout != interface->focus) {
         if (interface->focus != NULL) {
             layout_focus_clear(interface->focus);
@@ -1375,7 +1425,8 @@ void focus_point(Interface *interface, int x, int y, bool exact) {
 }
 
 void focus_add(Interface *interface, int x, int y, bool jump) {
-    Layout *focus_layout = ref_list_get(interface->layouts, interface->selected_tab);
+    Layout *focus_layout = ref_list_get(interface->layouts,
+                                        interface->selected_tab);
     if (focus_layout != interface->focus) {
         if (interface->focus != NULL) {
             layout_focus_clear(interface->focus);
@@ -1389,7 +1440,7 @@ void focus_add(Interface *interface, int x, int y, bool jump) {
     update_focus_control(interface);
 }
 
-bool interface_is_editing(Interface const * interface) {
+bool interface_is_editing(Interface const *interface) {
     return interface->focus_control != NULL && interface->focus_control->edit;
 }
 
@@ -1500,14 +1551,16 @@ bool handle_edge_focus(Interface *interface, Input const *input) {
 bool handle_wheel_focus(Interface *interface, Input const *input) {
     if (input_mouse_event_eq(input, MOUSE_EVENT_PRESS,
                              MOUSE_BUTTON_WHEEL_UP)) {
-        focus_first_col_or_same(interface, input->mouse.point.x, input->mouse.point.y);
+        focus_first_col_or_same(interface, input->mouse.point.x,
+                                input->mouse.point.y);
         focus_add(interface, 0, -2, false);
         return true;
     }
 
     if (input_mouse_event_eq(input, MOUSE_EVENT_PRESS,
                              MOUSE_BUTTON_WHEEL_DOWN)) {
-        focus_first_col_or_same(interface, input->mouse.point.x, input->mouse.point.y);
+        focus_first_col_or_same(interface, input->mouse.point.x,
+                                input->mouse.point.y);
         focus_add(interface, 0, 2, false);
         return true;
     }
@@ -1517,7 +1570,8 @@ bool handle_wheel_focus(Interface *interface, Input const *input) {
 
 bool handle_mouse_focus(Interface *interface, Input const *input) {
     if (input_mouse_event_eq(input, MOUSE_EVENT_PRESS, MOUSE_BUTTON)) {
-        focus_point(interface, input->mouse.point.x - 1, input->mouse.point.y, false);
+        focus_point(interface, input->mouse.point.x - 1,
+                     input->mouse.point.y, false);
         interface_edit(interface);
         return true;
     }
@@ -1558,8 +1612,6 @@ bool handle_edit(Interface *interface, Input const *input) {
     if (input_eq(input, &test)) {
         if (!interface_is_editing(interface)) {
             return interface_edit(interface);
-        } else {
-            return interface_save_edit(interface);
         }
     }
 

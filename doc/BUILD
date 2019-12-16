@@ -5,6 +5,8 @@ Requirements:
 
     make, gcc, libncurses5-dev
 
+    valgrind (used for mem checks)
+
 Set-up:
 
     To compile the project simply run: `make`

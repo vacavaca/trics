@@ -75,6 +75,8 @@ Edit mode
                                    (where no auto exit)
   ESC                            - exit from edit mode discarding changes
                                    (where no auto exit)
+  DEL                            - empty value
+  =                              - note-off
 
 Tip: If you accidentally hit CTRL + S press CTRL + Q to unfreeze your terminal emulator.
 

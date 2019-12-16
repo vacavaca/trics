@@ -74,7 +74,7 @@ typedef struct {
 } Filter;
 
 typedef struct {
-    char **name;
+    char *name;
     volatile int volume;
     volatile bool hard_restart;
 
@@ -101,7 +101,7 @@ typedef struct {
 } ArpeggioStep;
 
 typedef struct {
-    char **name;
+    char *name;
     volatile ArpeggioStep steps[MAX_ARPEGGIO_STEPS];
     volatile bool repeat;
     volatile int step;
@@ -125,7 +125,7 @@ typedef struct {
 } Pattern;
 
 typedef struct {
-    char **name;
+    char *name;
     volatile int length;
     volatile int bpm;
     volatile int step;

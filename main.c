@@ -53,7 +53,7 @@ void sleep_msec(int ms) {
 
 int main(int argc, char *argv[]) {
 
-    Song *song = song_init("Song Title");
+    Song *song = song_init("Song Title 2334g34g");
 
     Interface *interface = interface_init(song);
 

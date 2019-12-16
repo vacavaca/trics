@@ -9,6 +9,7 @@
 #include <stdbool.h> // bool
 #include <stdlib.h>  // malloc
 #include <string.h>  // memcpy
+#include <errno.h>   // errno
 
 #define DEFAULT_LIST_CAPACITY 64
 #define MAX_TEXT_WIDTH 24
@@ -52,11 +53,7 @@ typedef struct
         volatile int *const int_value;
         char ** text_value;
     };
-    union {
-        bool prev_bool_value;
-        int prev_int_value;
-        char **prev_text_value;
-    };
+    char *edit_value;
     Rect rect;
     bool focus;
     int focused_at;
