@@ -102,6 +102,7 @@ Control control_init_bool(volatile bool *const value, bool allow_empty) {
         .text_edit_reseted = false,
         .num_edit_reseted = false,
         .allow_empty = allow_empty,
+        .edit_value = NULL,
         .rect = (Rect){
             .x = 0,
             .y = 0,
@@ -120,6 +121,7 @@ Control control_init_int(volatile int *const value, bool allow_empty) {
         .text_edit_reseted = false,
         .num_edit_reseted = false,
         .allow_empty = allow_empty,
+        .edit_value = NULL,
         .rect = (Rect){
             .x = 0,
             .y = 0,
@@ -137,6 +139,7 @@ Control control_init_text(char **const value, int width, bool allow_empty) {
         .text_edit_reseted = false,
         .num_edit_reseted = false,
         .allow_empty = allow_empty,
+        .edit_value = NULL,
         .rect = (Rect){
             .x = 0,
             .y = 0,
@@ -164,7 +167,9 @@ char *control_repr_int(Control const *control) {
 char *control_repr_text(Control const *control, bool cut, bool ellipsis) {
     int len = strlen(*control->text_value);
     if (len == 0) {
-        return " ";
+        char *str = malloc(2);
+        sprintf(str, " ");
+        return str;
     }
 
     return text_cut(*control->text_value, control->rect.width, cut, ellipsis);
@@ -255,7 +260,7 @@ bool control_edit(Control *control) {
     return true;
 }
 
-InputResult control_handle_num_input(Control *control, char key) {
+InputResult control_handle_num_input(Control *control, unsigned char key) {
     // non hex chars and not backspace
     if ((key < 48 || key > 57) && (key < 97 || key > 102) && key != 127) {
         return (InputResult) { .handled = false };
@@ -284,7 +289,7 @@ InputResult control_handle_num_input(Control *control, char key) {
     }
 }
 
-InputResult control_handle_text_input(Control *control, char key) {
+InputResult control_handle_text_input(Control *control, unsigned char key) {
     // printable chars + backspace
     if (key < 32 || key > 127) {
         return (InputResult) { .handled = false };
@@ -315,8 +320,13 @@ InputResult control_handle_text_input(Control *control, char key) {
             return (InputResult) { .handled = true, .done = true };
         }
 
-        control->edit_value = realloc(control->edit_value, len + 2);
+        char *ex = realloc(control->edit_value, len + 2);
+        if (ex == NULL) {
+            return (InputResult) { .handled = false };
+        }
+        control->edit_value = ex;
         control->edit_value[len] = key;
+        control->edit_value[len + 1] = 0;
     }
 
     return (InputResult) { .handled = true };
@@ -360,12 +370,12 @@ void control_save_edit(Control *control) {
             }
 
             free(control->edit_value);
-            control->edit_value = NULL;
         } else if (control->type == CONTROL_TYPE_TEXT) {
-            int len = strlen(control->edit_value);
             free(*control->text_value);
             *control->text_value = control->edit_value;
         }
+
+        control->edit_value = NULL;
     }
 
     control->edit = false;
@@ -414,8 +424,11 @@ bool control_empty(Control* control) {
     } else {
         free(*control->text_value);
         char *val = malloc(1);
+        val[0] = 0;
         *control->text_value = val;
     }
+
+    return true;
 }
 
 typedef struct {
@@ -1745,7 +1758,7 @@ bool handle_edit(Interface *interface, Input const *input) {
     Input test_bsp = input_init_key(127);
     Input test_del = input_init_special(SPECIAL_KEY_DEL);
 
-    if (interface->focus_control != NULL && 
+    if (interface->focus_control != NULL && !is_editing &&
         (input_eq(input, &test_bsp) || input_eq(input, &test_del))) {
         return control_empty(interface->focus_control);
     }
