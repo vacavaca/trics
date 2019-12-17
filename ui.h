@@ -58,6 +58,9 @@ typedef struct
     bool focus;
     int focused_at;
     bool edit;
+    bool text_edit_reseted;
+    bool num_edit_reseted;
+    bool allow_empty;
 } Control;
 
 typedef struct

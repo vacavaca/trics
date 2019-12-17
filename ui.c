@@ -1,5 +1,10 @@
 #include "ui.h"
 
+typedef struct{
+    bool handled;
+    bool done;
+} InputResult;
+
 RefList *ref_list_init(void) {
     const size_t item_size = sizeof(void *);
     const size_t cap = item_size * DEFAULT_LIST_CAPACITY;
@@ -84,21 +89,19 @@ char *text_cut(char *str, int width, bool cut, bool ellipsis) {
         }
     }
 
-    if (len == 0) {
-        result[0] = ' ';
-        result[1] = '\0';
-    }
-
     return result;
 }
 
-Control control_init_bool(volatile bool *const value) {
+Control control_init_bool(volatile bool *const value, bool allow_empty) {
     return (Control){
         .type = CONTROL_TYPE_BOOL,
         .bool_value = value,
         .focus = false,
         .focused_at = -1,
         .edit = false,
+        .text_edit_reseted = false,
+        .num_edit_reseted = false,
+        .allow_empty = allow_empty,
         .rect = (Rect){
             .x = 0,
             .y = 0,
@@ -107,13 +110,16 @@ Control control_init_bool(volatile bool *const value) {
         }};
 }
 
-Control control_init_int(volatile int *const value) {
+Control control_init_int(volatile int *const value, bool allow_empty) {
     return (Control){
         .type = CONTROL_TYPE_INT,
         .int_value = value,
         .focus = false,
         .focused_at = -1,
         .edit = false,
+        .text_edit_reseted = false,
+        .num_edit_reseted = false,
+        .allow_empty = allow_empty,
         .rect = (Rect){
             .x = 0,
             .y = 0,
@@ -121,13 +127,16 @@ Control control_init_int(volatile int *const value) {
             .height = 1}};
 }
 
-Control control_init_text(char **const value, int width) {
+Control control_init_text(char **const value, int width, bool allow_empty) {
     return (Control){
         .type = CONTROL_TYPE_TEXT,
         .text_value = value,
         .focus = false,
         .focused_at = -1,
         .edit = false,
+        .text_edit_reseted = false,
+        .num_edit_reseted = false,
+        .allow_empty = allow_empty,
         .rect = (Rect){
             .x = 0,
             .y = 0,
@@ -153,6 +162,11 @@ char *control_repr_int(Control const *control) {
 }
 
 char *control_repr_text(Control const *control, bool cut, bool ellipsis) {
+    int len = strlen(*control->text_value);
+    if (len == 0) {
+        return " ";
+    }
+
     return text_cut(*control->text_value, control->rect.width, cut, ellipsis);
 }
 
@@ -241,6 +255,84 @@ bool control_edit(Control *control) {
     return true;
 }
 
+InputResult control_handle_num_input(Control *control, char key) {
+    // non hex chars and not backspace
+    if ((key < 48 || key > 57) && (key < 97 || key > 102) && key != 127) {
+        return (InputResult) { .handled = false };
+    }
+
+    if (key == 127) {
+        if (control->allow_empty) {
+            control->edit_value[0] = '-';
+            control->edit_value[1] = '-';
+            return (InputResult) { .handled = true, .done = true };
+        } else {
+            return (InputResult) { .handled = false };
+        }
+    }
+
+    if (!control->num_edit_reseted) {
+        control->edit_value[0] = ' ';
+        control->edit_value[1] = key;
+
+        control->num_edit_reseted = true;
+        return (InputResult) { .handled = true };
+    } else {
+        control->edit_value[0] = control->edit_value[1];
+        control->edit_value[1] = key;
+        return (InputResult) { .handled = true, .done = true };
+    }
+}
+
+InputResult control_handle_text_input(Control *control, char key) {
+    // printable chars + backspace
+    if (key < 32 || key > 127) {
+        return (InputResult) { .handled = false };
+    }
+
+    int len = strlen(control->edit_value);
+    if (key == 127) {
+        int bsp = control->rect.width < len ? control->rect.width : len;
+        control->edit_value[bsp - 1] = 0;
+        if (!control->text_edit_reseted) {
+            control->text_edit_reseted = true;
+        }
+        return (InputResult) { .handled = true };
+    }
+
+    if (!control->text_edit_reseted) {
+        if (key == 127) {
+            int bsp = control->rect.width < len ? control->rect.width : len;
+            control->edit_value[bsp - 1] = 0;
+        } else {
+            free(control->edit_value);
+            control->edit_value = malloc(2);
+            sprintf(control->edit_value, "%c", key);
+        }
+        control->text_edit_reseted = true;
+    } else {
+        if (len >= control->rect.width) {
+            return (InputResult) { .handled = true, .done = true };
+        }
+
+        control->edit_value = realloc(control->edit_value, len + 2);
+        control->edit_value[len] = key;
+    }
+
+    return (InputResult) { .handled = true };
+}
+
+InputResult control_handle_input(Control *control, char key) {
+    if (control->type == CONTROL_TYPE_BOOL ||
+        control->type == CONTROL_TYPE_INT) {
+        return control_handle_num_input(control, key);
+    } else if (control->type == CONTROL_TYPE_TEXT) {
+        return control_handle_text_input(control, key);
+    }
+
+    return (InputResult) { .handled = false };
+}
+
 void control_save_edit(Control *control) {
     if (!control->edit) {
         return;
@@ -254,7 +346,7 @@ void control_save_edit(Control *control) {
                 int value = strtol(control->edit_value, NULL, 16);
                 if (errno != EINVAL) {
                     if (control_bool) {
-                        *control->bool_value = value + 1;
+                        *control->bool_value = value > 1 ? 2 : 1;
                     } else {
                         *control->int_value = value + 1;
                     }
@@ -271,15 +363,14 @@ void control_save_edit(Control *control) {
             control->edit_value = NULL;
         } else if (control->type == CONTROL_TYPE_TEXT) {
             int len = strlen(control->edit_value);
-            if (len == 0) {
-                memcpy(control->edit_value, " ", 2);
-            }
             free(*control->text_value);
             *control->text_value = control->edit_value;
         }
     }
 
     control->edit = false;
+    control->text_edit_reseted = false;
+    control->num_edit_reseted = false;
 }
 
 void control_discard_edit(Control *control) {
@@ -295,12 +386,35 @@ void control_discard_edit(Control *control) {
     }
 
     control->edit = false;
+    control->text_edit_reseted = false;
+    control->num_edit_reseted = false;
 }
 
 void control_free(Control *control) {
     if (control->edit_value != NULL) {
         free(control->edit_value);
         control->edit_value = NULL;
+    }
+}
+
+bool control_empty(Control* control) {
+    if (!control->allow_empty) {
+        return false;
+    }
+
+    control_discard_edit(control);
+    bool control_bool = control->type == CONTROL_TYPE_BOOL;
+    bool control_int = control->type == CONTROL_TYPE_INT;
+    if (control_bool || control_int) {
+        if (control_bool) {
+            *control->bool_value = EMPTY;
+        } else {
+            *control->int_value = EMPTY;
+        }
+    } else {
+        free(*control->text_value);
+        char *val = malloc(1);
+        *control->text_value = val;
     }
 }
 
@@ -886,9 +1000,9 @@ ControlTable *init_song_params_table(Layout *layout, Song *const song) {
     }
 
     Control song_param_controls[3] = {
-        control_init_int(&song->bpm),
-        control_init_int(&song->step),
-        control_init_text(&song->name, 17),
+        control_init_int(&song->bpm, false),
+        control_init_int(&song->step, false),
+        control_init_text(&song->name, 17, true),
     };
 
     if (!control_table_add(song_params_table, song_param_controls)) {
@@ -907,14 +1021,14 @@ ControlTable *init_song_arrangement_table(Layout *layout, Song *const song) {
 
     for (int i = 0; i < 16; i++) {
         Control arrangement_row[8] = {
-            control_init_int(&song->patterns[i][0]),
-            control_init_int(&song->patterns[i][1]),
-            control_init_int(&song->patterns[i][2]),
-            control_init_int(&song->patterns[i][3]),
-            control_init_int(&song->patterns[i][4]),
-            control_init_int(&song->patterns[i][5]),
-            control_init_int(&song->patterns[i][6]),
-            control_init_int(&song->patterns[i][7]),
+            control_init_int(&song->patterns[i][0], true),
+            control_init_int(&song->patterns[i][1], true),
+            control_init_int(&song->patterns[i][2], true),
+            control_init_int(&song->patterns[i][3], true),
+            control_init_int(&song->patterns[i][4], true),
+            control_init_int(&song->patterns[i][5], true),
+            control_init_int(&song->patterns[i][6], true),
+            control_init_int(&song->patterns[i][7], true),
         };
 
         if (!control_table_add(arrangement_table, arrangement_row)) {
@@ -1580,7 +1694,8 @@ bool handle_mouse_focus(Interface *interface, Input const *input) {
 }
 
 bool handle_focus(Interface *interface, Input const *input) {
-    if (handle_step_focus(interface, input)) {
+    if (!interface_is_editing(interface) &&
+        handle_step_focus(interface, input)) {
         return true;
     }
 
@@ -1608,24 +1723,56 @@ bool handle_edit(Interface *interface, Input const *input) {
         return false;
     }
 
-    Input test = input_init_key(' ');
-    if (input_eq(input, &test)) {
-        if (!interface_is_editing(interface)) {
+    Input test_space = input_init_key(' ');
+    Input test_enter = input_init_special(SPECIAL_KEY_ENTER);
+    bool is_space = input_eq(input, &test_space);
+    bool is_enter = input_eq(input, &test_enter);
+    bool is_editing = interface_is_editing(interface);
+
+    if (!is_editing) {
+        if (is_space || is_enter) {
             return interface_edit(interface);
         }
-    }
-
-    test = input_init_special(SPECIAL_KEY_ESC);
-    if (input_eq(input, &test)) {
-        return interface_discard_edit(interface);
-    }
-
-    test = input_init_special(SPECIAL_KEY_ENTER);
-    if (input_eq(input, &test)) {
+    } else if (is_enter) {
         return interface_save_edit(interface);
     }
 
+    Input test_esc = input_init_special(SPECIAL_KEY_ESC);
+    if (input_eq(input, &test_esc)) {
+        return interface_discard_edit(interface);
+    }
+
+    Input test_bsp = input_init_key(127);
+    Input test_del = input_init_special(SPECIAL_KEY_DEL);
+
+    if (interface->focus_control != NULL && 
+        (input_eq(input, &test_bsp) || input_eq(input, &test_del))) {
+        return control_empty(interface->focus_control);
+    }
+
     return false;
+}
+
+bool handle_edit_input(Interface *interface, Input const *input) {
+    if (!interface_is_editing(interface)) {
+        return false;
+    }
+
+    if (input->type != INPUT_TYPE_KEY) {
+        return false;
+    }
+
+    if (!input->key.special) {
+        InputResult result = control_handle_input(interface->focus_control,
+                                                  input->key.ch);
+        if (result.done) {
+            interface_save_edit(interface);
+        }
+
+        return result.handled;
+    } else {
+        return false;
+    }
 }
 
 bool try_handle_input(Interface *interface, Input const *input) {
@@ -1646,6 +1793,10 @@ bool try_handle_input(Interface *interface, Input const *input) {
     }
 
     if (handle_edit(interface, input)) {
+        return true;
+    }
+
+    if (handle_edit_input(interface, input)) {
         return true;
     }
 

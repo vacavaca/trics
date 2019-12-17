@@ -59,7 +59,9 @@ Default and record mode
   arrow or h/j/k/l               - move cursor
   CTRL + arrow or CTRL + j/k     - move cursor one screen up/down
   ALT + arrow or ALT + j/k       - move cursor to the first/last row
-  SPACE or mouse click           - edit mode
+  SPACE or ENTER                 - edit mode
+  or mouse click
+
   CTRL + SPACE                   - play from selection or stop
   CTRL + r                       - start / stop recording
   mouse wheel                    - scroll table

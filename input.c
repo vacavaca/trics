@@ -6,6 +6,7 @@ const char MODIFIER_KEY_ALT = 1 << 1;
 const char *ARROW_ESC = "\x1B\x5B\0";
 const char *MOD_ARROW_ESC = "\x1B\x5B\x31\x3B\0";
 const char *MOUSE_ESC = "\x1B\x5B\x4D\0";
+const char *DEL_ESC = "\x1B\x5B\x33\x7E\0";
 
 Input input_init_key(char const ch) {
     return (Input){
@@ -161,6 +162,15 @@ SpecialKey char_to_arrow(char key) {
     return 0;
 }
 
+bool parse_del(char const *keys, Input *input) {
+    if (starts_with(keys, 4, DEL_ESC)) {
+        *input = input_init_special(SPECIAL_KEY_DEL);
+        return true;
+    }
+
+    return false;
+}
+
 bool parse_arrows(char const *keys, Input *input) {
     if (starts_with(keys, 3, ARROW_ESC)) {
         *input = input_init_special(char_to_arrow(keys[2]));
@@ -223,6 +233,10 @@ bool parse_navigation(char const *keys, Input *input) {
 int parse(char const *keys, int len, Input *input) {
     if (len >= 6 && parse_navigation(keys, input)) {
         return 6;
+    }
+
+    if (len >= 4 && parse_del(keys, input)) {
+        return 4;
     }
 
     if (len >= 3 && parse_arrows(keys, input)) {
@@ -345,6 +359,8 @@ char *input_repr(Input const *input) {
         } else {
             if (input->key.ch == ' ') {
                 repr_concat(&repr, "SPACE");
+            } else if (input->key.ch == 127) {
+                repr_concat(&repr, "BACKSPACE");
             } else {
                 repr_add(&repr, input->key.ch);
             }
