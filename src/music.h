@@ -1,6 +1,7 @@
 #ifndef MUSIC_H
 #define MUSIC_H
 
+#include "reflist.h" // RefList
 #include <stdbool.h> // bool
 #include <stdlib.h>  // malloc
 #include <string.h>  // memcpy
@@ -16,6 +17,8 @@
 #define MAX_ARPEGGIO_STEP 4
 #define MAX_PATTERN_LENGTH 64
 #define MAX_PATTERN_VOICES 2
+#define MAX_PATTERNS 256
+#define MAX_ARPEGGIOS 256
 #define MAX_TRACKS 8
 #define MAX_SONG_LENGTH 256
 #define EMPTY 0
@@ -74,7 +77,7 @@ typedef struct {
 } Filter;
 
 typedef struct {
-    char *name;
+    char **name;
     volatile int volume;
     volatile bool hard_restart;
 
@@ -120,7 +123,6 @@ typedef struct {
 
 typedef struct {
     volatile int length;
-    volatile int octaves[MAX_PATTERN_VOICES];
     volatile Step steps[MAX_PATTERN_LENGTH][MAX_PATTERN_VOICES];
 } Pattern;
 
@@ -137,5 +139,34 @@ Song *song_init(char const *name);
 int song_set_pattern(Song *song, int nbar, int nvoice, int pattern);
 
 void song_free(Song *song);
+
+typedef struct {
+    Song *song;
+    RefList *patterns;
+    RefList *instruments;
+    RefList *arpeggios;
+} MusicState;
+
+MusicState *music_state_init(char *song_name);
+
+int music_state_create_instrument(MusicState *state, char *name);
+
+Instrument *music_state_get_instrument(MusicState *state, int n);
+
+void music_state_del_instrument(MusicState *state, int n);
+
+int music_state_create_pattern(MusicState *state);
+
+Pattern *music_state_get_pattern(MusicState *state, int n);
+
+void music_state_del_pattern(MusicState *state, int n);
+
+int music_state_create_arpeggio(MusicState *state, char *name);
+
+Arpeggio *music_state_get_arpeggio(MusicState *state, int n);
+
+void music_state_del_arpeggio(MusicState *state, int n);
+
+void music_state_free(MusicState *state);
 
 #endif // MUSIC_H

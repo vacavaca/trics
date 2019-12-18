@@ -3,6 +3,7 @@
 
 #include "input.h"   // Input
 #include "music.h"   // Song
+#include "reflist.h" // RefList
 #include "util.h"    // Rect, sign
 #include <assert.h>  // assert
 #include <ncurses.h> // wmove wprintw
@@ -10,8 +11,8 @@
 #include <stdlib.h>  // malloc
 #include <string.h>  // memcpy
 #include <errno.h>   // errno
+#include <math.h>    // round
 
-#define DEFAULT_LIST_CAPACITY 64
 #define MAX_TEXT_WIDTH 24
 #define MAX_TABLE_COLUMNS 8
 #define MAX_TABLE_VISIBLE_ROWS 8
@@ -32,17 +33,12 @@ typedef enum {
     UI_COLOR_INVERSE,
 } Color;
 
-typedef struct {
-    size_t item_size;
-    int cap;
-    int length;
-    void **array;
-} RefList;
-
 typedef enum {
     CONTROL_TYPE_BOOL,
     CONTROL_TYPE_INT,
-    CONTROL_TYPE_TEXT
+    CONTROL_TYPE_TEXT,
+    CONTROL_TYPE_NOTE,
+    CONTROL_TYPE_OP
 } ControlType;
 
 typedef struct

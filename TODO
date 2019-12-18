@@ -1,22 +1,20 @@
-* editing 
-  * stpe editing
-  * octave editing
-  * double/half
-* auto add/remove rows to tables on focus
-* gaps in tables
-* operator control
-* display and edit notes
-* other tab layouts
-* instrument sound
-* playing
-* copy/paste
-* recording
-* envelopes
-* wave table (shapes)
-* ring mod
-* hard sync
-* pw mod
-* filter
-* arpeggios
-* delay
-* reverb
+* display and edit notes 1h
+* operator control 1h
+* gaps in tables 20m
+* other tab layouts 1.5h
+* instrument sound ?
+* playing ?
+* optimize refresh 4h
+  * only on input or bar
+  * refresh only restricted area
+* copy/paste 3h
+* recording ?
+* envelopes ?
+* wave table (shapes) ?
+* ring mod ?
+* hard sync ?
+* pw mod ?
+* filter ?
+* arpeggios ?
+* delay ?
+* reverb ?

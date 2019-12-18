@@ -5,76 +5,6 @@ typedef struct{
     bool done;
 } InputResult;
 
-RefList *ref_list_init(void) {
-    const size_t item_size = sizeof(void *);
-    const size_t cap = item_size * DEFAULT_LIST_CAPACITY;
-    void **array = malloc(cap);
-    if (array == NULL) {
-        return NULL;
-    }
-
-    RefList *list = malloc(sizeof(RefList));
-    if (list == NULL) {
-        free(array);
-        return NULL;
-    }
-
-    *list = (RefList){
-        .item_size = item_size,
-        .cap = cap,
-        .length = 0,
-        .array = array};
-
-    return list;
-}
-
-bool ref_list_add(RefList *list, void *item) {
-    if (list->length == list->cap) {
-        const size_t next_cap = list->cap * 2;
-        void **next = realloc(list->array, next_cap);
-        if (next == NULL) {
-            return false;
-        }
-        list->array = next;
-        list->cap = next_cap;
-    }
-
-    list->array[list->length] = item;
-    list->length += 1;
-    return true;
-}
-
-bool ref_list_set(RefList *list, int n, void *item) {
-    if (n >= list->cap) {
-        const size_t next_cap = list->cap * 2;
-        void **next = realloc(list->array, next_cap);
-        if (next == NULL) {
-            return false;
-        }
-        list->array = next;
-        list->cap = next_cap;
-    }
-
-    list->array[n] = item;
-    if (n >= list->length) {
-        list->length = n + 1;
-    }
-    return true;
-}
-
-void *ref_list_get(RefList *list, int n) {
-    if (n >= list->length) {
-        return NULL;
-    }
-
-    return list->array[n];
-}
-
-void ref_list_free(RefList *list) {
-    free(list->array);
-    free(list);
-}
-
 char *text_cut(char *str, int width, bool cut, bool ellipsis) {
     const int len = strlen(str);
     char *result = malloc(len + 1);
@@ -147,21 +77,28 @@ Control control_init_text(char **const value, int width, bool allow_empty) {
             .height = 1}};
 }
 
-char *control_repr_bool(Control const *control) {
+char *repr_bool(bool value) {
     char *str = malloc(3);
-    sprintf(str, "%02x", *control->bool_value);
+    sprintf(str, "%02x", value);
     return str;
 }
 
-char *control_repr_int(Control const *control) {
+char *repr_int(int value) {
     char *str = malloc(3);
-    int value = *control->int_value;
     if (value != EMPTY) {
         sprintf(str, "%02x", value - 1);
     } else {
         sprintf(str, "--");
     }
     return str;
+}
+
+char *control_repr_bool(Control const *control) {
+    return repr_bool(*control->bool_value);
+}
+
+char *control_repr_int(Control const *control) {
+    return repr_int(*control->int_value);
 }
 
 char *control_repr_text(Control const *control, bool cut, bool ellipsis) {
@@ -260,7 +197,91 @@ bool control_edit(Control *control) {
     return true;
 }
 
+void control_handle_step_input(Control *control, int i) {
+    if (i == 0) {
+        return;
+    }
+
+    bool control_bool = control->type == CONTROL_TYPE_BOOL;
+    bool control_int = control->type == CONTROL_TYPE_INT;
+    if (control_bool || control_int) {
+        int value = EMPTY;
+        if (strcmp(control->edit_value,"--")) {
+            value = strtol(control->edit_value, NULL, 16);
+            if (errno != EINVAL) {
+                value += 1;
+            } else {
+                value = EMPTY;
+            }
+        }
+
+        if (control_bool) {
+            value = value + i > 1 ? 2 : 1;
+        } else {
+            value += i;
+        }
+
+        if (value <= EMPTY) {
+            value = EMPTY;
+        } else if (value >= 256) {
+            value = 256;
+        }
+
+        free(control->edit_value);
+        if (control_bool) {
+            control->edit_value = repr_bool(value);
+        } else {
+            control->edit_value = repr_int(value);
+        }
+    }
+}
+
+void control_handle_multiplier_input(Control *control, double i) {
+    if (i == 1) {
+        return;
+    }
+
+    bool control_bool = control->type == CONTROL_TYPE_BOOL;
+    bool control_int = control->type == CONTROL_TYPE_INT;
+    if (control_bool || control_int) {
+        int value = EMPTY;
+        if (strcmp(control->edit_value,"--")) {
+            value = strtol(control->edit_value, NULL, 16);
+            if (errno == EINVAL) {
+                value = EMPTY;
+            }
+        }
+
+        if (control_bool) {
+            value = (int)round((double)value * i) > 1 ? 2 : 1;
+        } else {
+            value = (int)round((double)value * i);
+        }
+
+        value += 1;
+
+        if (value <= EMPTY) {
+            value = EMPTY;
+        } else if (value >= 256) {
+            value = 256;
+        }
+
+        free(control->edit_value);
+        if (control_bool) {
+            control->edit_value = repr_bool(value);
+        } else {
+            control->edit_value = repr_int(value);
+        }
+    }
+}
+
 InputResult control_handle_num_input(Control *control, unsigned char key) {
+    if (key == 'j') {
+        control_handle_step_input(control, -1);
+    } else if (key == 'k') {
+        control_handle_step_input(control, 1);
+    }
+
     // non hex chars and not backspace
     if ((key < 48 || key > 57) && (key < 97 || key > 102) && key != 127) {
         return (InputResult) { .handled = false };
@@ -341,6 +362,15 @@ InputResult control_handle_input(Control *control, char key) {
     }
 
     return (InputResult) { .handled = false };
+}
+
+bool control_handle_wheel_input(Control *control, Point const *point, int i) {
+    if (!rect_contains(&control->rect, point)) {
+        return false;
+    }
+
+    control_handle_step_input(control, i);
+    return true;
 }
 
 void control_save_edit(Control *control) {
@@ -591,8 +621,10 @@ void control_table_focus_last(ControlTable *table) {
         table->focus_column = 0;
     }
 
-    table->offset = table->rows->length - MAX_TABLE_VISIBLE_ROWS - 1;
-    table->offset = table->rows->length - 1 - MAX_TABLE_VISIBLE_ROWS;
+    table->offset = table->rows->length - MAX_TABLE_VISIBLE_ROWS;
+    if (table->offset < 0) {
+        table->offset = 0;
+    }
     Control *row = ref_list_get(table->rows, table->focus_row);
     table->focus = &row[table->focus_column];
     control_focus(table->focus);
@@ -1088,16 +1120,26 @@ cleanup_layout:
     return NULL;
 }
 
+ControlTable *init_instrument_params_table(Layout *layout, Song *const song) {
+    char const *headers[3] = {"##", "o1", "o2"};
+    ControlTable *table = control_table_init(3, 2, 3, 8, headers);
+    if (table == NULL) {
+        return NULL;
+    }
+
+}
+
 bool init_layouts(Interface *interface, Song *const song) {
     Layout *song_layout = init_song_layout(song);
     if (song_layout == NULL) {
         return false;
     }
-    interface_set_layout(interface, TAB_SONG, song_layout);
+
+    if (!interface_set_layout(interface, TAB_SONG, song_layout)) {
+        return false;
+    }
 
     return true;
-
-    return false;
 }
 
 Interface *interface_init(Song *const song) {
@@ -1128,6 +1170,10 @@ Interface *interface_init(Song *const song) {
     }
 
     return interface;
+}
+
+bool interface_is_editing(Interface const *interface) {
+    return interface->focus_control != NULL && interface->focus_control->edit;
 }
 
 void draw_primary_tabs(WINDOW *win, Interface const *interface) {
@@ -1184,7 +1230,8 @@ void draw_secondary_tabs(WINDOW *win, Interface const *interface) {
 }
 
 void draw_filled_input_repr(WINDOW *win, Interface *interface, int draw_time) {
-    wmove(win, 15, 25 - interface->input_repr_length);
+    int offset = interface_is_editing(interface) ? 22 : 25;
+    wmove(win, 15, offset - interface->input_repr_length);
     wprintw(win, interface->input_repr);
     if (interface->input_repr_printed_at == -1) {
         interface->input_repr_printed_at = draw_time;
@@ -1218,6 +1265,18 @@ void draw_input_repr(WINDOW *win, Interface *interface, int draw_time) {
     attroff(COLOR_PAIR(UI_COLOR_GREY));
 }
 
+void draw_edit_value(WINDOW *win, Interface *interface) {
+    if (!interface_is_editing(interface)) {
+        return;
+    }
+
+    if (interface->focus_control->type == CONTROL_TYPE_BOOL ||
+        interface->focus_control->type == CONTROL_TYPE_INT) {
+        wmove(win, 15, 23);
+        wprintw(win, interface->focus_control->edit_value);
+    }
+}
+
 void draw_layout(WINDOW *win, Interface *interface, int draw_time) {
     Layout const *layout = ref_list_get(interface->layouts,
                                         interface->selected_tab);
@@ -1231,6 +1290,7 @@ void interface_draw(WINDOW *win, Interface *interface, int draw_time) {
     draw_primary_tabs(win, interface);
     draw_secondary_tabs(win, interface);
     draw_input_repr(win, interface, draw_time);
+    draw_edit_value(win, interface);
     draw_layout(win, interface, draw_time);
 }
 
@@ -1567,9 +1627,6 @@ void focus_add(Interface *interface, int x, int y, bool jump) {
     update_focus_control(interface);
 }
 
-bool interface_is_editing(Interface const *interface) {
-    return interface->focus_control != NULL && interface->focus_control->edit;
-}
 
 bool interface_discard_edit(Interface *interface) {
     if (interface->focus_control == NULL) {
@@ -1766,16 +1823,34 @@ bool handle_edit(Interface *interface, Input const *input) {
     return false;
 }
 
-bool handle_edit_input(Interface *interface, Input const *input) {
-    if (!interface_is_editing(interface)) {
-        return false;
-    }
-
-    if (input->type != INPUT_TYPE_KEY) {
-        return false;
-    }
-
+bool handle_edit_key_input(Interface *interface, Input const *input) {
     if (!input->key.special) {
+        if (input->key.modifier == MODIFIER_KEY_CTRL) {
+            int i;
+            if (input->key.ch == 'j') {
+                i = -12;
+            } else if (input->key.ch == 'k') {
+                i = 12;
+            }
+
+            if (i != 0) {
+                control_handle_step_input(interface->focus_control, i);
+                return true;
+            }
+        } else if (input->key.modifier == MODIFIER_KEY_ALT) {
+            double i = 1;
+            if (input->key.ch == 'j') {
+                i = 0.5;
+            } else if (input->key.ch == 'k') {
+                i = 2;
+            }
+
+            if (i != 1) {
+                control_handle_multiplier_input(interface->focus_control, i);
+                return true;
+            }
+        }
+
         InputResult result = control_handle_input(interface->focus_control,
                                                   input->key.ch);
         if (result.done) {
@@ -1784,8 +1859,78 @@ bool handle_edit_input(Interface *interface, Input const *input) {
 
         return result.handled;
     } else {
+        Input test_up = input_init_special(SPECIAL_KEY_UP);
+        Input test_oct_up = input_init_modified_special(MODIFIER_KEY_CTRL,
+                                                        SPECIAL_KEY_UP);
+        Input test_mult_up = input_init_modified_special(MODIFIER_KEY_ALT,
+                                                         SPECIAL_KEY_UP);
+        Input test_down = input_init_special(SPECIAL_KEY_DOWN);
+        Input test_oct_down = input_init_modified_special(MODIFIER_KEY_CTRL,
+                                                          SPECIAL_KEY_DOWN);
+        Input test_mult_down = input_init_modified_special(MODIFIER_KEY_ALT,
+                                                          SPECIAL_KEY_DOWN);
+
+        double m = 1;
+        if (input_eq(input, &test_mult_up)) {
+            m = 2;
+        } else if (input_eq(input, &test_mult_down)) {
+            m = 0.5;
+        }
+
+        if (m != 1) {
+            control_handle_multiplier_input(interface->focus_control, m);
+            return true;
+        }
+
+
+        int i = 0;
+        if (input_eq(input, &test_up)) {
+            i = 1;
+        } else if (input_eq(input, &test_oct_up)) {
+            i = 12;
+        } else if (input_eq(input, &test_down)) {
+            i = -1;
+        } else if (input_eq(input, &test_oct_down)) {
+            i = -12;
+        }
+
+        if (i != 0) {
+            control_handle_step_input(interface->focus_control, i);
+        }
+        return true;
+    }
+}
+
+bool handle_edit_mouse_input(Interface *interface, Input const *input) {
+    bool is_wheel_up = input_mouse_event_eq(input, MOUSE_EVENT_PRESS,
+                                            MOUSE_BUTTON_WHEEL_UP);
+    bool is_wheel_down = input_mouse_event_eq(input, MOUSE_EVENT_PRESS,
+                                              MOUSE_BUTTON_WHEEL_DOWN);
+
+    if (is_wheel_up) {
+        return control_handle_wheel_input(interface->focus_control,
+                                          &input->mouse.point, 1);
+    } else if (is_wheel_down) {
+        return control_handle_wheel_input(interface->focus_control,
+                                          &input->mouse.point, -1);
+    }
+
+    return false;
+}
+
+
+bool handle_edit_input(Interface *interface, Input const *input) {
+    if (!interface_is_editing(interface)) {
         return false;
     }
+
+    if (input->type == INPUT_TYPE_KEY) {
+        return handle_edit_key_input(interface, input);
+    } else if (input->type == INPUT_TYPE_MOUSE) {
+        return handle_edit_mouse_input(interface, input);
+    }
+
+    return false;
 }
 
 bool try_handle_input(Interface *interface, Input const *input) {
@@ -1801,15 +1946,15 @@ bool try_handle_input(Interface *interface, Input const *input) {
         return true;
     }
 
-    if (handle_focus(interface, input)) {
-        return true;
-    }
-
     if (handle_edit(interface, input)) {
         return true;
     }
 
     if (handle_edit_input(interface, input)) {
+        return true;
+    }
+
+    if (handle_focus(interface, input)) {
         return true;
     }
 

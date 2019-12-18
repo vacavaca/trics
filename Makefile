@@ -1,4 +1,7 @@
-TARGET = bin/trics
+BIN_NAME = trics
+BUILD_DIR = build
+SRC_DIR = src
+TARGET = $(BUILD_DIR)/$(BIN_NAME)
 LIBS = -lm -lncurses
 CC = gcc
 CFLAGS = -g -Wall -Wextra -Wpedantic \
@@ -6,29 +9,26 @@ CFLAGS = -g -Wall -Wextra -Wpedantic \
           -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
           -Wredundant-decls -Wnested-externs -Wmissing-include-dirs
 
-.PHONY: default all clean run run-check
-
 default: $(TARGET)
 all: default
 
-OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
-HEADERS = $(wildcard *.h)
+OBJECTS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(wildcard $(SRC_DIR)/*.c))
+HEADERS = $(wildcard $(SRC_DIR)/*.h)
 
-%.o: %.c $(HEADERS)
+test:
+	echo $(HEADERS)
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-.PRECIOUS: $(TARGET) $(OBJECTS)
+$(BUILD_DIR):
+	mkdir $(BUILD_DIR)
 
-bin:
-	mkdir bin
-
-$(TARGET): bin $(OBJECTS)
+$(TARGET): $(BUILD_DIR) $(OBJECTS)
 	$(CC) $(OBJECTS) -Wall $(LIBS) -o $@
 
 clean:
-	rm -f *.o
-	rm -f $(TARGET)
-	rm -rf bin
+	rm -rf $(BUILD_DIR)
 
 run: default
 	./$(TARGET)
@@ -39,7 +39,9 @@ run-check: default
 		--leak-check=full \
 		--show-leak-kinds=all \
 		--leak-check=full \
-		--log-file="bin/valgrind.log" \
+		--log-file="$(BUILD_DIR)/valgrind.log" \
 		--tool=memcheck \
 		--suppressions=ncurses.supp  \
 		$(TARGET)
+
+.PHONY: default all clean run run-check
