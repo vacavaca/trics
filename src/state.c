@@ -1,4 +1,4 @@
-#include "music.h"
+#include "state.h"
 
 const char WAVETYPE_NOIZE = 1;
 
@@ -16,6 +16,8 @@ Instrument *instrument_init(char const *name) {
 
     *instrument = (Instrument){
         .volume = 256,
+        .pan = 128,
+        .octave = 4,
         .hard_restart = false,
         .amplitude_attack = 2,
         .amplitude_decay = 0,
@@ -34,19 +36,21 @@ Instrument *instrument_init(char const *name) {
 
     memcpy(instrument->name, name, len + 1);
 
-    instrument_set_wave_step(instrument, (WaveStep){.types = WAVETYPE_SQUARE},
-                             0);
+    WaveStep wave_step = (WaveStep){
+        .types = WAVETYPE_SQUARE};
+
+    instrument_set_wave_step(instrument, 0, wave_step);
 
     return instrument;
 }
 
-void instrument_set_wave_step(Instrument *instrument, WaveStep step, int n) {
+void instrument_set_wave_step(Instrument *instrument, int n, WaveStep step) {
     instrument->wave.steps[n] = step;
     instrument->wave.length = n + 1;
 }
 
-void instrument_set_fitler_step(Instrument *instrument, FilterStep step,
-                                int n) {
+void instrument_set_fitler_step(Instrument *instrument, int n,
+                                FilterStep step) {
     instrument->filter.steps[n] = step;
     instrument->filter.length = n + 1;
 }
@@ -73,11 +77,22 @@ Arpeggio *arpeggio_init(char const *name) {
 
     memcpy(arpeggio->name, name, len + 1);
 
+    ArpeggioStep step = (ArpeggioStep){
+        .pitch_operator = OPERATOR_ADD,
+        .pitch = 0};
+
+    arpeggio_set_step(arpeggio, 0, step);
+
     return arpeggio;
 }
 
+void arpeggio_set_step(Arpeggio *arpeggio, int n, ArpeggioStep step) {
+    arpeggio->steps[n] = step;
+    arpeggio->length = n + 1;
+}
+
 void arpeggio_free(Arpeggio *arpeggio) {
-    free(*arpeggio->name);
+    free(arpeggio->name);
     free(arpeggio);
 }
 
@@ -115,7 +130,23 @@ void song_free(Song *song) {
     free(song);
 }
 
-MusicState *music_state_init(char *song_name) {
+bool state_init_defaults(State *state) {
+    if (!state_create_instrument(state, "Default")) {
+        return false;
+    }
+
+    if (!state_create_pattern(state)) {
+        return false;
+    }
+
+    if (!state_create_arpeggio(state, "Default")) {
+        return false;
+    }
+
+    return true;
+}
+
+State *state_init(char *song_name) {
     Song *song = song_init(song_name);
     if (song == NULL) {
         return NULL;
@@ -136,16 +167,20 @@ MusicState *music_state_init(char *song_name) {
         goto cleanup_patterns;
     }
 
-    MusicState *state = malloc(sizeof(MusicState));
+    State *state = malloc(sizeof(State));
     if (state == NULL) {
         goto cleanup;
     }
 
-    *state = (MusicState){
+    *state = (State){
         .song = song,
         .instruments = instruments,
         .patterns = patterns,
         .arpeggios = arpeggios};
+
+    if (!state_init_defaults(state)) {
+        goto cleanup;
+    }
 
     return state;
 
@@ -160,7 +195,11 @@ cleanup_song:
     return NULL;
 }
 
-int music_state_create_instrument(MusicState *state, char *name) {
+int state_create_instrument(State *state, char const *name) {
+    if (state->instruments->length >= MAX_INSTRUMENTS) {
+        return -1;
+    }
+
     Instrument *instrument = instrument_init(name);
     if (instrument == NULL) {
         return -1;
@@ -174,14 +213,23 @@ int music_state_create_instrument(MusicState *state, char *name) {
     return state->instruments->length - 1;
 }
 
-Instrument *music_state_get_instrument(MusicState *state, int n);
+Instrument *state_get_instrument(State *state, int n) {
+    return ref_list_get(state->instruments, n);
+}
 
-void music_state_del_instrument(MusicState *state, int n);
+void state_del_instrument(State *state, int n) {
+    if (ref_list_has(state->instruments, n)) {
+        ref_list_set(state->instruments, n, NULL);
+    }
+}
 
-int music_state_create_pattern(MusicState *state) {
+int state_create_pattern(State *state) {
+    if (state->patterns->length >= MAX_PATTERNS) {
+        return -1;
+    }
+
     Pattern *pattern = malloc(sizeof(Pattern));
-    *pattern = (Pattern){ .length = 16 };
-
+    *pattern = (Pattern){ .length = state->song->step };
 
     if (!ref_list_add(state->patterns, pattern)) {
         return -1;
@@ -190,11 +238,21 @@ int music_state_create_pattern(MusicState *state) {
     return state->patterns->length - 1;
 }
 
-Pattern *music_state_get_pattern(MusicState *state, int n);
+Pattern *state_get_pattern(State *state, int n) {
+    return ref_list_get(state->patterns, n);
+}
 
-void music_state_del_pattern(MusicState *state, int n);
+void state_del_pattern(State *state, int n) {
+    if (ref_list_has(state->patterns, n)) {
+        ref_list_set(state->patterns, n, NULL);
+    }
+}
 
-int music_state_create_arpeggio(MusicState *state, char *name) {
+int state_create_arpeggio(State *state, char const *name) {
+    if (state->arpeggios->length >= MAX_ARPEGGIOS) {
+        return -1;
+    }
+
     Arpeggio *arpeggio = arpeggio_init(name);
     if (arpeggio == NULL) {
         return -1;
@@ -208,11 +266,17 @@ int music_state_create_arpeggio(MusicState *state, char *name) {
     return state->arpeggios->length - 1;
 }
 
-Arpeggio *music_state_get_arpeggio(MusicState *state, int n);
+Arpeggio *state_get_arpeggio(State *state, int n) {
+    return ref_list_get(state->arpeggios, n);
+}
 
-void music_state_del_arpeggio(MusicState *state, int n);
+void state_del_arpeggio(State *state, int n) {
+    if (ref_list_has(state->arpeggios, n)) {
+        ref_list_set(state->arpeggios, n, NULL);
+    }
+}
 
-void music_state_free(MusicState *state) {
+void state_free(State *state) {
     song_free(state->song);
 
     for (int i = 0; i < state->instruments->length; i++) {

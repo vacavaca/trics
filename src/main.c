@@ -1,5 +1,5 @@
 #include "input.h"
-#include "music.h"
+#include "state.h"
 #include "ui.h"
 #include <ncurses.h> // ncurses functions
 #include <signal.h>  // signal

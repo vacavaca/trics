@@ -1,7 +1,7 @@
 #include "reflist.h"
 
 
-RefList *ref_list_init() {
+RefList *ref_list_init(void) {
     const size_t item_size = sizeof(void *);
     const size_t cap = item_size * DEFAULT_LIST_CAPACITY;
     void **array = malloc(cap);

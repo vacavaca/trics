@@ -1,5 +1,5 @@
-#ifndef MUSIC_H
-#define MUSIC_H
+#ifndef STATE_H
+#define STATE_H
 
 #include "reflist.h" // RefList
 #include <stdbool.h> // bool
@@ -18,6 +18,7 @@
 #define MAX_PATTERN_LENGTH 64
 #define MAX_PATTERN_VOICES 2
 #define MAX_PATTERNS 256
+#define MAX_INSTRUMENTS 256
 #define MAX_ARPEGGIOS 256
 #define MAX_TRACKS 8
 #define MAX_SONG_LENGTH 256
@@ -77,8 +78,10 @@ typedef struct {
 } Filter;
 
 typedef struct {
-    char **name;
+    char *name;
     volatile int volume;
+    volatile int pan;
+    volatile int octave;
     volatile bool hard_restart;
 
     volatile int amplitude_attack;
@@ -92,9 +95,9 @@ typedef struct {
 
 Instrument *instrument_init(char const *name);
 
-void instrument_set_wave_step(Instrument *instrument, WaveStep step, int n);
+void instrument_set_wave_step(Instrument *instrument, int n, WaveStep step);
 
-void instrument_set_filter_step(Instrument *instrument, FilterStep step, int n);
+void instrument_set_filter_step(Instrument *instrument, int n, FilterStep step);
 
 void instrument_free(Instrument *instrument);
 
@@ -112,6 +115,8 @@ typedef struct {
 } Arpeggio;
 
 Arpeggio *arpeggio_init(char const *name);
+
+void arpeggio_set_step(Arpeggio *arpeggio, int n, ArpeggioStep step);
 
 void arpeggio_free(Arpeggio *arpeggio);
 
@@ -145,28 +150,28 @@ typedef struct {
     RefList *patterns;
     RefList *instruments;
     RefList *arpeggios;
-} MusicState;
+} State;
 
-MusicState *music_state_init(char *song_name);
+State *state_init(char *song_name);
 
-int music_state_create_instrument(MusicState *state, char *name);
+int state_create_instrument(State *state, char const *name);
 
-Instrument *music_state_get_instrument(MusicState *state, int n);
+Instrument *state_get_instrument(State *state, int n);
 
-void music_state_del_instrument(MusicState *state, int n);
+void state_del_instrument(State *state, int n);
 
-int music_state_create_pattern(MusicState *state);
+int state_create_pattern(State *state);
 
-Pattern *music_state_get_pattern(MusicState *state, int n);
+Pattern *state_get_pattern(State *state, int n);
 
-void music_state_del_pattern(MusicState *state, int n);
+void state_del_pattern(State *state, int n);
 
-int music_state_create_arpeggio(MusicState *state, char *name);
+int state_create_arpeggio(State *state, char const *name);
 
-Arpeggio *music_state_get_arpeggio(MusicState *state, int n);
+Arpeggio *state_get_arpeggio(State *state, int n);
 
-void music_state_del_arpeggio(MusicState *state, int n);
+void state_del_arpeggio(State *state, int n);
 
-void music_state_free(MusicState *state);
+void state_free(State *state);
 
-#endif // MUSIC_H
+#endif // STATE_H

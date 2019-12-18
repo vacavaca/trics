@@ -2,7 +2,7 @@
 #define UI_H
 
 #include "input.h"   // Input
-#include "music.h"   // Song
+#include "state.h"   // Song, State
 #include "reflist.h" // RefList
 #include "util.h"    // Rect, sign
 #include <assert.h>  // assert
@@ -38,7 +38,8 @@ typedef enum {
     CONTROL_TYPE_INT,
     CONTROL_TYPE_TEXT,
     CONTROL_TYPE_NOTE,
-    CONTROL_TYPE_OP
+    CONTROL_TYPE_OP,
+    CONTROL_TYPE_SELF_INT
 } ControlType;
 
 typedef struct
@@ -48,6 +49,7 @@ typedef struct
         volatile bool *const bool_value;
         volatile int *const int_value;
         char ** text_value;
+        int self_int_value;
     };
     char *edit_value;
     Rect rect;
@@ -57,6 +59,10 @@ typedef struct
     bool text_edit_reseted;
     bool num_edit_reseted;
     bool allow_empty;
+
+    union {
+        void (*on_self_int_edit)(int);
+    };
 } Control;
 
 typedef struct

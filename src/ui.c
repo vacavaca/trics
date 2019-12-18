@@ -33,6 +33,7 @@ Control control_init_bool(volatile bool *const value, bool allow_empty) {
         .num_edit_reseted = false,
         .allow_empty = allow_empty,
         .edit_value = NULL,
+        .on_self_int_edit = NULL,
         .rect = (Rect){
             .x = 0,
             .y = 0,
@@ -52,6 +53,7 @@ Control control_init_int(volatile int *const value, bool allow_empty) {
         .num_edit_reseted = false,
         .allow_empty = allow_empty,
         .edit_value = NULL,
+        .on_self_int_edit = NULL,
         .rect = (Rect){
             .x = 0,
             .y = 0,
@@ -70,10 +72,31 @@ Control control_init_text(char **const value, int width, bool allow_empty) {
         .num_edit_reseted = false,
         .allow_empty = allow_empty,
         .edit_value = NULL,
+        .on_self_int_edit = NULL,
         .rect = (Rect){
             .x = 0,
             .y = 0,
             .width = width,
+            .height = 1}};
+}
+
+Control control_init_self_int(int value, bool allow_empty,
+                              void (*on_edit)(int)) {
+    return (Control){
+        .type = CONTROL_TYPE_SELF_INT,
+        .self_int_value = value,
+        .focus = false,
+        .focused_at = -1,
+        .edit = false,
+        .text_edit_reseted = false,
+        .num_edit_reseted = false,
+        .allow_empty = allow_empty,
+        .edit_value = NULL,
+        .on_self_int_edit = on_edit,
+        .rect = (Rect){
+            .x = 0,
+            .y = 0,
+            .width = 2,
             .height = 1}};
 }
 
@@ -98,7 +121,13 @@ char *control_repr_bool(Control const *control) {
 }
 
 char *control_repr_int(Control const *control) {
-    return repr_int(*control->int_value);
+    if (control->type == CONTROL_TYPE_INT) {
+        return repr_int(*control->int_value);
+    } else if (control->type == CONTROL_TYPE_SELF_INT) {
+        return repr_int(control->self_int_value);
+    }
+
+    return NULL;
 }
 
 char *control_repr_text(Control const *control, bool cut, bool ellipsis) {
@@ -115,7 +144,8 @@ char *control_repr_text(Control const *control, bool cut, bool ellipsis) {
 char *control_repr(Control* control, bool cut, bool ellipsis) {
     if (control->type == CONTROL_TYPE_BOOL) {
         return control_repr_bool(control);
-    } else if (control->type == CONTROL_TYPE_INT) {
+    } else if (control->type == CONTROL_TYPE_INT ||
+               control->type == CONTROL_TYPE_SELF_INT) {
         return control_repr_int(control);
     } else if (control->type == CONTROL_TYPE_TEXT) {
         return control_repr_text(control, cut, ellipsis);
@@ -154,14 +184,18 @@ void control_draw(WINDOW *win, Control *control, int draw_time) {
 
     if (!control->edit) {
         char *repr = control_repr(control, true, true);
-        wprintw(win, repr);
-        free(repr);
+        if (repr != NULL) {
+            wprintw(win, repr);
+            free(repr);
+        }
     } else {
         if (control->edit_value != NULL) {
             char *repr = text_cut(control->edit_value, control->rect.width,
                                   true, false);
-            wprintw(win, "%s", repr);
-            free(repr);
+            if (repr != NULL) {
+                wprintw(win, "%s", repr);
+                free(repr);
+            }
         }
     }
 
@@ -403,6 +437,8 @@ void control_save_edit(Control *control) {
         } else if (control->type == CONTROL_TYPE_TEXT) {
             free(*control->text_value);
             *control->text_value = control->edit_value;
+        } else {
+            free(control->edit_value);
         }
 
         control->edit_value = NULL;
@@ -564,7 +600,11 @@ void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
         Control *first_row = ref_list_get(table->rows, 0);
         for (int i = 0; i < table->column_count; i++) {
             int x = table->rect.x + offset;
-            offset += first_row[i].rect.width + 1;
+            if (table->rows->length > 0) {
+                offset += first_row[i].rect.width + 1;
+            } else {
+                offset += 3;
+            }
 
             wmove(win, table->rect.y, x);
             wprintw(win, table->headers[i]);
@@ -1120,13 +1160,70 @@ cleanup_layout:
     return NULL;
 }
 
-ControlTable *init_instrument_params_table(Layout *layout, Song *const song) {
-    char const *headers[3] = {"##", "o1", "o2"};
+ControlTable *init_pattern_params_table(Layout *layout) {
+    char const *headers[3] = {"##", "t1", "t2"};
     ControlTable *table = control_table_init(3, 2, 3, 8, headers);
     if (table == NULL) {
         return NULL;
     }
 
+    Control controls[3] = {
+        control_init_self_int(1, false, NULL),
+        control_init_self_int(5, false, NULL),
+        control_init_self_int(5, false, NULL),
+    };
+
+    if (!control_table_add(table, controls)) {
+        control_table_free(table);
+        return NULL;
+    }
+
+    return table;
+}
+
+ControlTable *init_pattern_table(Layout *layout) {
+    char const *headers[6] = {"in", "nt", "ar", "in", "nt", "ar"};
+    ControlTable *table = control_table_init(6, 2, 6, 23, headers);
+    if (table == NULL) {
+        return NULL;
+    }
+
+    return table;
+}
+
+Layout *init_pattern_layout() {
+    Layout *layout = layout_init();
+    if (layout == NULL) {
+        return NULL;
+    }
+
+    ControlTable *params_table = init_pattern_params_table(layout);
+    if (params_table == NULL) {
+        goto cleanup_layout;
+    }
+
+    if (!layout_add_table(layout, params_table)) {
+        goto cleanup_params_table;
+    }
+
+    ControlTable *pattern_table = init_pattern_table(layout);
+    if (pattern_table == NULL) {
+        goto cleanup_params_table;
+    }
+
+    if (!layout_add_table(layout, pattern_table)) {
+        goto cleanup_pattern_table;
+    }
+
+    return layout;
+
+cleanup_pattern_table:
+    control_table_free(pattern_table);
+cleanup_params_table:
+    control_table_free(params_table);
+cleanup_layout:
+    layout_free(layout);
+    return NULL;
 }
 
 bool init_layouts(Interface *interface, Song *const song) {
@@ -1136,10 +1233,25 @@ bool init_layouts(Interface *interface, Song *const song) {
     }
 
     if (!interface_set_layout(interface, TAB_SONG, song_layout)) {
-        return false;
+        goto cleanup_song_layout;
+    }
+
+    Layout *pattern_layout = init_pattern_layout();
+    if (pattern_layout == NULL) {
+        goto cleanup_song_layout;
+    }
+
+    if (!interface_set_layout(interface, TAB_PATTERN, pattern_layout)) {
+        goto cleanup_pattern_layout;
     }
 
     return true;
+
+cleanup_pattern_layout:
+    layout_free(pattern_layout);
+cleanup_song_layout:
+    layout_free(song_layout);
+    return false;
 }
 
 Interface *interface_init(Song *const song) {

@@ -13,7 +13,7 @@ typedef struct {
     void **array;
 } RefList;
 
-RefList *ref_list_init();
+RefList *ref_list_init(void);
 
 bool ref_list_add(RefList *list, void *item);
 

@@ -1,12 +1,12 @@
 * display and edit notes 1h
 * operator control 1h
 * gaps in tables 20m
-* other tab layouts 1.5h
-* instrument sound ?
-* playing ?
 * optimize refresh 4h
   * only on input or bar
   * refresh only restricted area
+* other tab layouts 1.5h
+* instrument sound ?
+* playing ?
 * copy/paste 3h
 * recording ?
 * envelopes ?
