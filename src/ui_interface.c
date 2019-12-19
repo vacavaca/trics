@@ -1,1065 +1,4 @@
-#include "ui.h"
-
-typedef struct{
-    bool handled;
-    bool done;
-} InputResult;
-
-char *text_cut(char *str, int width, bool cut, bool ellipsis) {
-    const int len = strlen(str);
-    char *result = malloc(len + 1);
-
-    memcpy(result, str, len + 1);
-    if (cut && len > width) {
-        result[width] = '\0';
-        if (ellipsis) {
-            result[width - 1] = '.';
-            result[width - 2] = '.';
-            result[width - 3] = '.';
-        }
-    }
-
-    return result;
-}
-
-Control control_init_bool(volatile bool *const value, bool allow_empty) {
-    return (Control){
-        .type = CONTROL_TYPE_BOOL,
-        .bool_value = value,
-        .focus = false,
-        .focused_at = -1,
-        .edit = false,
-        .text_edit_reseted = false,
-        .num_edit_reseted = false,
-        .allow_empty = allow_empty,
-        .edit_value = NULL,
-        .on_self_int_edit = NULL,
-        .rect = (Rect){
-            .x = 0,
-            .y = 0,
-            .width = 2,
-            .height = 1,
-        }};
-}
-
-Control control_init_int(volatile int *const value, bool allow_empty) {
-    return (Control){
-        .type = CONTROL_TYPE_INT,
-        .int_value = value,
-        .focus = false,
-        .focused_at = -1,
-        .edit = false,
-        .text_edit_reseted = false,
-        .num_edit_reseted = false,
-        .allow_empty = allow_empty,
-        .edit_value = NULL,
-        .on_self_int_edit = NULL,
-        .rect = (Rect){
-            .x = 0,
-            .y = 0,
-            .width = 2,
-            .height = 1}};
-}
-
-Control control_init_text(char **const value, int width, bool allow_empty) {
-    return (Control){
-        .type = CONTROL_TYPE_TEXT,
-        .text_value = value,
-        .focus = false,
-        .focused_at = -1,
-        .edit = false,
-        .text_edit_reseted = false,
-        .num_edit_reseted = false,
-        .allow_empty = allow_empty,
-        .edit_value = NULL,
-        .on_self_int_edit = NULL,
-        .rect = (Rect){
-            .x = 0,
-            .y = 0,
-            .width = width,
-            .height = 1}};
-}
-
-Control control_init_self_int(int value, bool allow_empty,
-                              void (*on_edit)(int)) {
-    return (Control){
-        .type = CONTROL_TYPE_SELF_INT,
-        .self_int_value = value,
-        .focus = false,
-        .focused_at = -1,
-        .edit = false,
-        .text_edit_reseted = false,
-        .num_edit_reseted = false,
-        .allow_empty = allow_empty,
-        .edit_value = NULL,
-        .on_self_int_edit = on_edit,
-        .rect = (Rect){
-            .x = 0,
-            .y = 0,
-            .width = 2,
-            .height = 1}};
-}
-
-char *repr_bool(bool value) {
-    char *str = malloc(3);
-    sprintf(str, "%02x", value);
-    return str;
-}
-
-char *repr_int(int value) {
-    char *str = malloc(3);
-    if (value != EMPTY) {
-        sprintf(str, "%02x", value - 1);
-    } else {
-        sprintf(str, "--");
-    }
-    return str;
-}
-
-char *control_repr_bool(Control const *control) {
-    return repr_bool(*control->bool_value);
-}
-
-char *control_repr_int(Control const *control) {
-    if (control->type == CONTROL_TYPE_INT) {
-        return repr_int(*control->int_value);
-    } else if (control->type == CONTROL_TYPE_SELF_INT) {
-        return repr_int(control->self_int_value);
-    }
-
-    return NULL;
-}
-
-char *control_repr_text(Control const *control, bool cut, bool ellipsis) {
-    int len = strlen(*control->text_value);
-    if (len == 0) {
-        char *str = malloc(2);
-        sprintf(str, " ");
-        return str;
-    }
-
-    return text_cut(*control->text_value, control->rect.width, cut, ellipsis);
-}
-
-char *control_repr(Control* control, bool cut, bool ellipsis) {
-    if (control->type == CONTROL_TYPE_BOOL) {
-        return control_repr_bool(control);
-    } else if (control->type == CONTROL_TYPE_INT ||
-               control->type == CONTROL_TYPE_SELF_INT) {
-        return control_repr_int(control);
-    } else if (control->type == CONTROL_TYPE_TEXT) {
-        return control_repr_text(control, cut, ellipsis);
-    }
-
-    return NULL;
-}
-
-void control_draw(WINDOW *win, Control *control, int draw_time) {
-    int color;
-    if (control->focus || control->edit) {
-        if (control->focused_at == -1) {
-            control->focused_at = draw_time;
-        }
-
-        const int double_refresh_rate = CURSOR_BLINK_RATE_MSEC * 2;
-        if (control->edit ||
-            draw_time - control->focused_at < CURSOR_BLINK_RATE_MSEC) {
-            color = UI_COLOR_INVERSE;
-        } else if (draw_time - control->focused_at > double_refresh_rate) {
-            control->focused_at = draw_time;
-            color = UI_COLOR_INVERSE;
-        } else {
-            color = UI_COLOR_BRIGHT;
-        }
-    } else {
-        color = UI_COLOR_BRIGHT;
-    }
-
-    if (control->edit) {
-        attron(A_BOLD);
-    }
-
-    attron(COLOR_PAIR(color));
-    wmove(win, control->rect.y, control->rect.x);
-
-    if (!control->edit) {
-        char *repr = control_repr(control, true, true);
-        if (repr != NULL) {
-            wprintw(win, repr);
-            free(repr);
-        }
-    } else {
-        if (control->edit_value != NULL) {
-            char *repr = text_cut(control->edit_value, control->rect.width,
-                                  true, false);
-            if (repr != NULL) {
-                wprintw(win, "%s", repr);
-                free(repr);
-            }
-        }
-    }
-
-    attroff(COLOR_PAIR(color));
-
-    if (control->edit) {
-        attroff(A_BOLD);
-    }
-}
-
-void control_focus(Control *control) {
-    control->focus = true;
-    control->focused_at = -1;
-}
-
-void control_focus_clear(Control *control) {
-    control->focus = false;
-    if (control->edit && control->edit_value != NULL) {
-        free(control->edit_value);
-        control->edit_value = NULL;
-    }
-    control->edit = false;
-}
-
-bool control_edit(Control *control) {
-    if (control->edit) {
-        return true;
-    }
-
-    control->edit_value = control_repr(control, false, false);
-
-    control->edit = true;
-    return true;
-}
-
-void control_handle_step_input(Control *control, int i) {
-    if (i == 0) {
-        return;
-    }
-
-    bool control_bool = control->type == CONTROL_TYPE_BOOL;
-    bool control_int = control->type == CONTROL_TYPE_INT;
-    if (control_bool || control_int) {
-        int value = EMPTY;
-        if (strcmp(control->edit_value,"--")) {
-            value = strtol(control->edit_value, NULL, 16);
-            if (errno != EINVAL) {
-                value += 1;
-            } else {
-                value = EMPTY;
-            }
-        }
-
-        if (control_bool) {
-            value = value + i > 1 ? 2 : 1;
-        } else {
-            value += i;
-        }
-
-        if (value <= EMPTY) {
-            value = EMPTY;
-        } else if (value >= 256) {
-            value = 256;
-        }
-
-        free(control->edit_value);
-        if (control_bool) {
-            control->edit_value = repr_bool(value);
-        } else {
-            control->edit_value = repr_int(value);
-        }
-    }
-}
-
-void control_handle_multiplier_input(Control *control, double i) {
-    if (i == 1) {
-        return;
-    }
-
-    bool control_bool = control->type == CONTROL_TYPE_BOOL;
-    bool control_int = control->type == CONTROL_TYPE_INT;
-    if (control_bool || control_int) {
-        int value = EMPTY;
-        if (strcmp(control->edit_value,"--")) {
-            value = strtol(control->edit_value, NULL, 16);
-            if (errno == EINVAL) {
-                value = EMPTY;
-            }
-        }
-
-        if (control_bool) {
-            value = (int)round((double)value * i) > 1 ? 2 : 1;
-        } else {
-            value = (int)round((double)value * i);
-        }
-
-        value += 1;
-
-        if (value <= EMPTY) {
-            value = EMPTY;
-        } else if (value >= 256) {
-            value = 256;
-        }
-
-        free(control->edit_value);
-        if (control_bool) {
-            control->edit_value = repr_bool(value);
-        } else {
-            control->edit_value = repr_int(value);
-        }
-    }
-}
-
-InputResult control_handle_num_input(Control *control, unsigned char key) {
-    if (key == 'j') {
-        control_handle_step_input(control, -1);
-    } else if (key == 'k') {
-        control_handle_step_input(control, 1);
-    }
-
-    // non hex chars and not backspace
-    if ((key < 48 || key > 57) && (key < 97 || key > 102) && key != 127) {
-        return (InputResult) { .handled = false };
-    }
-
-    if (key == 127) {
-        if (control->allow_empty) {
-            control->edit_value[0] = '-';
-            control->edit_value[1] = '-';
-            return (InputResult) { .handled = true, .done = true };
-        } else {
-            return (InputResult) { .handled = false };
-        }
-    }
-
-    if (!control->num_edit_reseted) {
-        control->edit_value[0] = ' ';
-        control->edit_value[1] = key;
-
-        control->num_edit_reseted = true;
-        return (InputResult) { .handled = true };
-    } else {
-        control->edit_value[0] = control->edit_value[1];
-        control->edit_value[1] = key;
-        return (InputResult) { .handled = true, .done = true };
-    }
-}
-
-InputResult control_handle_text_input(Control *control, unsigned char key) {
-    // printable chars + backspace
-    if (key < 32 || key > 127) {
-        return (InputResult) { .handled = false };
-    }
-
-    int len = strlen(control->edit_value);
-    if (key == 127) {
-        int bsp = control->rect.width < len ? control->rect.width : len;
-        control->edit_value[bsp - 1] = 0;
-        if (!control->text_edit_reseted) {
-            control->text_edit_reseted = true;
-        }
-        return (InputResult) { .handled = true };
-    }
-
-    if (!control->text_edit_reseted) {
-        if (key == 127) {
-            int bsp = control->rect.width < len ? control->rect.width : len;
-            control->edit_value[bsp - 1] = 0;
-        } else {
-            free(control->edit_value);
-            control->edit_value = malloc(2);
-            sprintf(control->edit_value, "%c", key);
-        }
-        control->text_edit_reseted = true;
-    } else {
-        if (len >= control->rect.width) {
-            return (InputResult) { .handled = true, .done = true };
-        }
-
-        char *ex = realloc(control->edit_value, len + 2);
-        if (ex == NULL) {
-            return (InputResult) { .handled = false };
-        }
-        control->edit_value = ex;
-        control->edit_value[len] = key;
-        control->edit_value[len + 1] = 0;
-    }
-
-    return (InputResult) { .handled = true };
-}
-
-InputResult control_handle_input(Control *control, char key) {
-    if (control->type == CONTROL_TYPE_BOOL ||
-        control->type == CONTROL_TYPE_INT) {
-        return control_handle_num_input(control, key);
-    } else if (control->type == CONTROL_TYPE_TEXT) {
-        return control_handle_text_input(control, key);
-    }
-
-    return (InputResult) { .handled = false };
-}
-
-bool control_handle_wheel_input(Control *control, Point const *point, int i) {
-    if (!rect_contains(&control->rect, point)) {
-        return false;
-    }
-
-    control_handle_step_input(control, i);
-    return true;
-}
-
-void control_save_edit(Control *control) {
-    if (!control->edit) {
-        return;
-    }
-
-    if (control->edit_value != NULL) {
-        bool control_bool = control->type == CONTROL_TYPE_BOOL;
-        bool control_int = control->type == CONTROL_TYPE_INT;
-        if (control_bool || control_int) {
-            if (strcmp(control->edit_value,"--")) {
-                int value = strtol(control->edit_value, NULL, 16);
-                if (errno != EINVAL) {
-                    if (control_bool) {
-                        *control->bool_value = value > 1 ? 2 : 1;
-                    } else {
-                        *control->int_value = value + 1;
-                    }
-                }
-            } else {
-                if (control_bool) {
-                    *control->bool_value = 0;
-                } else {
-                   *control->int_value = EMPTY;
-               }
-            }
-
-            free(control->edit_value);
-        } else if (control->type == CONTROL_TYPE_TEXT) {
-            free(*control->text_value);
-            *control->text_value = control->edit_value;
-        } else {
-            free(control->edit_value);
-        }
-
-        control->edit_value = NULL;
-    }
-
-    control->edit = false;
-    control->text_edit_reseted = false;
-    control->num_edit_reseted = false;
-}
-
-void control_discard_edit(Control *control) {
-    if (!control->edit) {
-        return;
-    }
-
-    if (control->type == CONTROL_TYPE_TEXT) {
-        if (control->edit_value != NULL) {
-            free(control->edit_value);
-        }
-        control->edit_value = NULL;
-    }
-
-    control->edit = false;
-    control->text_edit_reseted = false;
-    control->num_edit_reseted = false;
-}
-
-void control_free(Control *control) {
-    if (control->edit_value != NULL) {
-        free(control->edit_value);
-        control->edit_value = NULL;
-    }
-}
-
-bool control_empty(Control* control) {
-    if (!control->allow_empty) {
-        return false;
-    }
-
-    control_discard_edit(control);
-    bool control_bool = control->type == CONTROL_TYPE_BOOL;
-    bool control_int = control->type == CONTROL_TYPE_INT;
-    if (control_bool || control_int) {
-        if (control_bool) {
-            *control->bool_value = EMPTY;
-        } else {
-            *control->int_value = EMPTY;
-        }
-    } else {
-        free(*control->text_value);
-        char *val = malloc(1);
-        val[0] = 0;
-        *control->text_value = val;
-    }
-
-    return true;
-}
-
-typedef struct {
-    int x;
-    int y;
-    bool jump;
-} Cursor;
-
-ControlTable *control_table_init(int column_count, int x, int y, int width,
-                                 char const **headers) {
-    assert(column_count > 0);
-    assert(column_count <= MAX_TABLE_COLUMNS);
-
-    RefList *list = ref_list_init();
-    if (list == NULL) {
-        return NULL;
-    }
-
-    char **table_headers = NULL;
-    int i = 0;
-    if (headers != NULL) {
-        table_headers = malloc(sizeof(char *) * column_count);
-        if (table_headers == NULL) {
-            goto cleanup_list;
-        }
-
-        for (; i < column_count; i++) {
-            const size_t len = strlen(headers[i]);
-            char *header = malloc(len + 1);
-            if (header == NULL) {
-                goto cleanup;
-            }
-            memcpy(header, headers[i], len + 1);
-            table_headers[i] = header;
-        }
-    }
-
-    ControlTable *table = malloc(sizeof(ControlTable));
-    if (table == NULL) {
-        goto cleanup;
-    }
-
-    *table = (ControlTable){
-        .headers = table_headers,
-        .column_count = column_count,
-        .rows = list,
-        .rect = (Rect){
-            .x = x,
-            .y = y,
-            .width = width,
-            .height = (table_headers != NULL ? 1 : 0),
-        },
-        .focus = NULL,
-        .focus_row = 0,
-        .focus_column = 0,
-        .offset = 0,
-    };
-
-    return table;
-
-cleanup:
-    for (int j = 0; j < i; j++) {
-        free(table_headers[j]);
-    }
-    if (headers != NULL) {
-        free(table_headers);
-    }
-cleanup_list:
-    ref_list_free(list);
-    return NULL;
-}
-
-bool control_table_add(ControlTable *table, Control const *row) {
-    const size_t size = sizeof(Control) * table->column_count;
-    Control *table_row = malloc(size);
-    if (table_row == NULL) {
-        return false;
-    }
-
-    memcpy(table_row, row, size);
-
-    int y_offset = table->headers != NULL ? 1 : 0;
-    int x_offset = 0;
-    for (int i = 0; i < table->column_count; i++) {
-        table_row[i].rect.y = table->rect.y + y_offset + table->rows->length;
-        table_row[i].rect.x = table->rect.x + x_offset;
-        x_offset += table_row[i].rect.width + 1;
-    }
-
-    if (!ref_list_add(table->rows, table_row)) {
-        free(table_row);
-        return false;
-    }
-
-    table->rect.height += 1;
-
-    return true;
-}
-
-void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
-    if (table->headers != NULL) {
-        int offset = 0;
-        Control *first_row = ref_list_get(table->rows, 0);
-        for (int i = 0; i < table->column_count; i++) {
-            int x = table->rect.x + offset;
-            if (table->rows->length > 0) {
-                offset += first_row[i].rect.width + 1;
-            } else {
-                offset += 3;
-            }
-
-            wmove(win, table->rect.y, x);
-            wprintw(win, table->headers[i]);
-        }
-    }
-
-    int header_offset = table->headers != NULL ? 1 : 0;
-    for (int i = 0; i < table->rows->length; i++) {
-        Control *row = ref_list_get(table->rows, i);
-        for (int j = 0; j < table->column_count; j++) {
-            Control *control = &row[j];
-            control->rect.y = i - table->offset + table->rect.y +
-                              header_offset;
-            if (i >= table->offset &&
-                i < table->offset + MAX_TABLE_VISIBLE_ROWS) {
-                control_draw(win, &row[j], draw_time);
-            }
-        }
-    }
-
-    bool offset_positive = table->offset > 0;
-    bool offset_above_end = (table->offset + MAX_TABLE_VISIBLE_ROWS) <
-                            table->rows->length;
-    if (offset_positive) {
-        wmove(win, 15, 1);
-        wprintw(win, "^");
-    }
-
-    if (offset_above_end) {
-        wmove(win, 15, 2);
-        wprintw(win, "...");
-    }
-}
-
-void control_table_focus_first(ControlTable *table) {
-    table->focus_row = 0;
-    if (table->focus != NULL) {
-        control_focus_clear(table->focus);
-    } else {
-        table->focus_column = 0;
-    }
-
-    table->offset = 0;
-    Control *row = ref_list_get(table->rows, table->focus_row);
-    table->focus = &row[table->focus_column];
-    control_focus(table->focus);
-}
-
-void control_table_focus_last(ControlTable *table) {
-    table->focus_row = table->rows->length - 1;
-    if (table->focus != NULL) {
-        control_focus_clear(table->focus);
-    } else {
-        table->focus_column = 0;
-    }
-
-    table->offset = table->rows->length - MAX_TABLE_VISIBLE_ROWS;
-    if (table->offset < 0) {
-        table->offset = 0;
-    }
-    Control *row = ref_list_get(table->rows, table->focus_row);
-    table->focus = &row[table->focus_column];
-    control_focus(table->focus);
-}
-
-bool control_table_focus_first_col(ControlTable *table, int y) {
-    bool find = false;
-    double min_d;
-    int row_n = 0;
-    Control *focus;
-
-    for (int i = 0; i < table->rows->length; i++) {
-        Control *row = ref_list_get(table->rows, i);
-        Control *control = &row[0];
-        Point point = (Point){.x = control->rect.x, .y = y};
-        double d = rect_distance_to(&control->rect, &point);
-        if (!find || d < min_d) {
-            min_d = d;
-            focus = control;
-            find = true;
-            row_n = i;
-
-            if (d == 0.0) {
-                i = table->rows->length; // break outer
-                break;
-            }
-        }
-    }
-
-    if (table->focus != NULL && table->focus != focus) {
-        control_focus_clear(table->focus);
-    }
-
-    if (focus == NULL) {
-        return false;
-    }
-
-    table->focus = focus;
-    table->focus_row = row_n;
-    table->focus_column = 0;
-    control_focus(focus);
-    return true;
-}
-
-// returns false if cursor leaves table while jump
-// must always return true when jump = false
-bool control_table_focus_add(ControlTable *table, int x, int y,
-                             bool jump, Cursor *cursor) {
-    if (table->rows->length == 0) {
-        return false;
-    }
-
-    if (table->focus == NULL) {
-        Control *control = ref_list_get(table->rows, 0);
-        table->focus = control;
-        table->focus_row = 0;
-        table->focus_column = 0;
-        table->offset = 0;
-        control_focus(control);
-        *cursor = (Cursor){.x = control->rect.x, .y = control->rect.y};
-        return true;
-    }
-
-    int focus_column = table->focus_column + x;
-    int focus_row = table->focus_row + y;
-
-    if (focus_column < 0) {
-        if (jump) {
-            *cursor = (Cursor){
-                .x = table->rect.x + x,
-                .y = table->focus->rect.y,
-                .jump = jump};
-
-            return true;
-        } else {
-            focus_column = 0;
-        }
-    } else if (focus_column >= table->column_count) {
-        if (jump) {
-            *cursor = (Cursor){
-                .x = table->rect.x + table->rect.width + x,
-                .y = table->focus->rect.y,
-                .jump = jump};
-
-            return true;
-        } else {
-            focus_column = table->column_count - 1;
-        }
-    }
-
-    if (focus_row < 0) {
-        if (jump) {
-            *cursor = (Cursor){
-                .x = table->focus->rect.x,
-                .y = table->rect.y + y,
-                .jump = jump};
-
-            return true;
-        } else {
-            focus_row = 0;
-        }
-    } else if (focus_row >= table->rows->length) {
-        if (jump) {
-            *cursor = (Cursor){
-                .x = table->focus->rect.x,
-                .y = table->rect.y + table->rect.height + y,
-                .jump = jump};
-
-            return true;
-        } else {
-            focus_row = table->rows->length - 1;
-        }
-    }
-
-    control_focus_clear(table->focus);
-    Control *controls = ref_list_get(table->rows, focus_row);
-    Control *control = &controls[focus_column];
-
-    if (focus_row - table->offset >= MAX_TABLE_VISIBLE_ROWS) {
-        table->offset = focus_row - MAX_TABLE_VISIBLE_ROWS + 1;
-    } else if (focus_row - table->offset < 0) {
-        table->offset = focus_row;
-    }
-
-    table->focus = control;
-    table->focus_row = focus_row;
-    table->focus_column = focus_column;
-    control_focus(control);
-    *cursor = (Cursor){.x = control->rect.x, .y = control->rect.y};
-    return true;
-}
-
-bool control_table_focus_point(ControlTable *table, int x, int y, bool exact) {
-    bool find = false;
-    double min_d;
-    int row_n = 0;
-    int column_n = 0;
-    Control *focus;
-    Point point = (Point){.x = x, .y = y};
-
-    for (int i = 0; i < table->rows->length; i++) {
-        Control *row = ref_list_get(table->rows, i);
-        for (int j = 0; j < table->column_count; j++) {
-            Control *control = &row[j];
-            double d = rect_distance_to(&control->rect, &point);
-            if (!find || d < min_d) {
-                min_d = d;
-                focus = control;
-                find = true;
-                row_n = i;
-                column_n = j;
-
-                if (d == 0.0) {
-                    i = table->rows->length; // break outer
-                    break;
-                }
-            }
-        }
-    }
-
-    if (min_d != 0.0 && exact) {
-        return false;
-    }
-
-    if (table->focus != NULL && table->focus != focus) {
-        control_focus_clear(table->focus);
-    }
-
-    if (focus == NULL) {
-        return false;
-    }
-
-    table->focus = focus;
-    table->focus_row = row_n;
-    table->focus_column = column_n;
-    control_focus(focus);
-    return true;
-}
-
-void control_table_focus_clear(ControlTable *table) {
-    if (table->focus != NULL) {
-        control_focus_clear(table->focus);
-        table->focus = NULL;
-    }
-}
-
-void control_table_free(ControlTable *table) {
-    for (int i = 0; i < table->rows->length; i++) {
-        Control *row = ref_list_get(table->rows, i);
-        for (int j = 0; j < table->column_count; j++) {
-            control_free(&row[j]);
-        }
-        free(row);
-    }
-    if (table->headers != NULL) {
-        for (int i = 0; i < table->column_count; i++) {
-            free(table->headers[i]);
-        }
-        free(table->headers);
-    }
-    ref_list_free(table->rows);
-    free(table);
-}
-
-Layout *layout_init(void) {
-    RefList *tables = ref_list_init();
-    if (tables == NULL) {
-        return NULL;
-    }
-
-    Layout *layout = malloc(sizeof(Layout));
-
-    *layout = (Layout){
-        .tables = tables,
-        .focus = NULL};
-
-    return layout;
-}
-
-bool layout_add_table(Layout *layout, ControlTable *table) {
-    return ref_list_add(layout->tables, table);
-}
-
-void layout_draw(WINDOW *win, Layout const *layout, int draw_time) {
-    for (int i = 0; i < layout->tables->length; i++) {
-        control_table_draw(win, ref_list_get(layout->tables, i), draw_time);
-    }
-}
-
-void layout_focus_clear(Layout *layout) {
-    ControlTable *table = layout->focus;
-    if (table != NULL) {
-        control_table_focus_clear(table);
-    }
-
-    layout->focus = NULL;
-}
-
-void layout_focus_first(Layout *layout) {
-    ControlTable *focus = layout->focus;
-    if (focus == NULL) {
-        bool find = false;
-        int min_x;
-        int min_y;
-
-        for (int i = 0; i < layout->tables->length; i++) {
-            ControlTable *table = ref_list_get(layout->tables, i);
-            if (!find || table->rect.x < min_x || table->rect.y < min_y) {
-                min_x = table->rect.x;
-                min_y = table->rect.y;
-                focus = table;
-                find = true;
-            }
-        }
-    }
-
-    control_table_focus_first(focus);
-    layout->focus = focus;
-}
-
-void layout_focus_last(Layout *layout) {
-    ControlTable *focus = layout->focus;
-    if (focus == NULL) {
-        bool find = false;
-        int min_x;
-        int min_y;
-
-        for (int i = 0; i < layout->tables->length; i++) {
-            ControlTable *table = ref_list_get(layout->tables, i);
-            if (!find || table->rect.x < min_x || table->rect.y < min_y) {
-                min_x = table->rect.x;
-                min_y = table->rect.y;
-                focus = table;
-                find = true;
-            }
-        }
-    }
-
-    control_table_focus_last(focus);
-    layout->focus = focus;
-}
-
-void layout_focux_first_col_or_same(Layout *layout, int x, int y) {
-    ControlTable *focus = NULL;
-    for (int i = 0; i < layout->tables->length; i++) {
-        ControlTable *table = ref_list_get(layout->tables, i);
-        if (x >= table->rect.x && x <= table->rect.x + table->rect.width &&
-            y >= table->rect.y && y <= table->rect.y + table->rect.height) {
-            focus = table;
-            break;
-        }
-    }
-
-    if (layout->focus != NULL && layout->focus != focus) {
-        layout_focus_clear(layout);
-    }
-
-    if (layout->focus == NULL && focus != NULL) {
-        if (control_table_focus_first_col(focus, y)) {
-            layout->focus = focus;
-        }
-    }
-}
-
-// if not exact find closest
-void layout_focus_point(Layout *layout, int x, int y, bool exact) {
-    ControlTable *focus = NULL;
-    for (int i = 0; i < layout->tables->length; i++) {
-        ControlTable *table = ref_list_get(layout->tables, i);
-        if (x >= table->rect.x && x <= table->rect.x + table->rect.width &&
-            y >= table->rect.y && y <= table->rect.y + table->rect.height) {
-            focus = table;
-            break;
-        }
-    }
-
-    if (layout->focus != NULL && layout->focus != focus) {
-        layout_focus_clear(layout);
-    }
-
-    if (focus != NULL) {
-        if (control_table_focus_point(focus, x, y, false)) {
-            layout->focus = focus;
-        }
-    }
-}
-
-void layout_focus_add(Layout *layout, int x, int y, bool jump) {
-    if (layout->focus == NULL) {
-        bool find = false;
-        int min_x;
-        int min_y;
-        ControlTable *focus = NULL;
-
-        for (int i = 0; i < layout->tables->length; i++) {
-            ControlTable *table = ref_list_get(layout->tables, i);
-            if (!find || table->rect.x < min_x || table->rect.y < min_y) {
-                min_x = table->rect.x;
-                min_y = table->rect.y;
-                focus = table;
-                find = true;
-            }
-        }
-
-        Cursor _;
-        if (control_table_focus_add(focus, x, y, false, &_)) {
-            layout->focus = focus;
-        }
-    } else {
-        Cursor cursor;
-        bool can_focus = control_table_focus_add(layout->focus, x, y,
-                                                 jump, &cursor);
-        if (can_focus && cursor.jump) {
-            bool find = false;
-            int min_d;
-            ControlTable *focus = NULL;
-            Point origin = (Point){.x = cursor.x - x, .y = cursor.y - y};
-            Point ray = (Point){.x = x, .y = y};
-            Point inter;
-
-            for (int i = 0; i < layout->tables->length; i++) {
-                ControlTable *table = ref_list_get(layout->tables, i);
-                if (table == layout->focus ||
-                    !rect_ray_intersection(&table->rect, &origin,
-                                           &ray, &inter)) {
-                    continue;
-                }
-
-                Point local_inter = (Point){
-                    .x = inter.x - origin.x,
-                    .y = inter.y - origin.y};
-                double d = length(&local_inter);
-                if (!find || d < min_d) {
-                    min_d = d;
-                    focus = table;
-                    find = true;
-                }
-            }
-
-            if (focus != NULL && layout->focus != focus) {
-                control_table_focus_clear(layout->focus);
-                layout->focus = focus;
-                control_table_focus_point(focus, cursor.x, cursor.y, false);
-            }
-        }
-    }
-}
-
-void layout_free(Layout *layout) {
-    for (int i = 0; i < layout->tables->length; i++) {
-        control_table_free(ref_list_get(layout->tables, i));
-    }
-    ref_list_free(layout->tables);
-    free(layout);
-}
+#include "ui_interface.h"
 
 const Tab PRIMARY_TABS[4] = {
     TAB_SONG,
@@ -1126,7 +65,7 @@ ControlTable *init_song_arrangement_table(Layout *layout, Song *const song) {
 }
 
 Layout *init_song_layout(Song *const song) {
-    Layout *layout = layout_init();
+    Layout *layout = layout_init(NULL);
     if (layout == NULL) {
         return NULL;
     }
@@ -1160,6 +99,44 @@ cleanup_layout:
     return NULL;
 }
 
+bool pattern_table_set_pattern(Layout const *layout, ControlTable *table,
+                               int n) {
+    while (n >= layout->state->patterns->length) {
+        if (state_create_pattern(layout->state) == -1) {
+            return false;
+        }
+    }
+ 
+    Pattern *pattern = state_get_pattern(layout->state, n);
+    if (pattern == NULL) {
+        return false;
+    }
+
+    for (int i = 0; i < MAX_PATTERN_LENGTH; i++) {
+        Control row[3 * MAX_PATTERN_VOICES];
+        for (int j = 0; j < MAX_PATTERN_VOICES; j++) {
+            volatile Step *step = &pattern->steps[i][j];
+            row[0 + j * 3] = control_init_int(&step->instrument, true);
+            row[1 + j * 3] = control_init_int(&step->note, true);
+            row[2 + j * 3] = control_init_int(&step->arpeggio, true);
+        }
+
+        if (!control_table_set(table, i, row)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void handle_control_select_layout(void *self) {
+    Control *control = self;
+    Layout *layout = control->layout;
+    ControlTable *pattern_table = ref_list_get(layout->tables, 1);
+    pattern_table_set_pattern(layout, pattern_table,
+                              control->self_int_value - 1);
+}
+
 ControlTable *init_pattern_params_table(Layout *layout) {
     char const *headers[3] = {"##", "t1", "t2"};
     ControlTable *table = control_table_init(3, 2, 3, 8, headers);
@@ -1168,9 +145,9 @@ ControlTable *init_pattern_params_table(Layout *layout) {
     }
 
     Control controls[3] = {
-        control_init_self_int(1, false, NULL),
-        control_init_self_int(5, false, NULL),
-        control_init_self_int(5, false, NULL),
+        control_init_self_int(1, false, layout, handle_control_select_layout),
+        control_init_self_int(5, false, layout, NULL),
+        control_init_self_int(5, false, layout, NULL),
     };
 
     if (!control_table_add(table, controls)) {
@@ -1188,11 +165,16 @@ ControlTable *init_pattern_table(Layout *layout) {
         return NULL;
     }
 
+    if (!pattern_table_set_pattern(layout, table, 0)) {
+        control_table_free(table);
+        return NULL;
+    }
+
     return table;
 }
 
-Layout *init_pattern_layout() {
-    Layout *layout = layout_init();
+Layout *init_pattern_layout(State *const state) {
+    Layout *layout = layout_init(state);
     if (layout == NULL) {
         return NULL;
     }
@@ -1226,8 +208,8 @@ cleanup_layout:
     return NULL;
 }
 
-bool init_layouts(Interface *interface, Song *const song) {
-    Layout *song_layout = init_song_layout(song);
+bool init_layouts(Interface *interface, State *const state) {
+    Layout *song_layout = init_song_layout(state->song);
     if (song_layout == NULL) {
         return false;
     }
@@ -1236,7 +218,7 @@ bool init_layouts(Interface *interface, Song *const song) {
         goto cleanup_song_layout;
     }
 
-    Layout *pattern_layout = init_pattern_layout();
+    Layout *pattern_layout = init_pattern_layout(state);
     if (pattern_layout == NULL) {
         goto cleanup_song_layout;
     }
@@ -1254,7 +236,7 @@ cleanup_song_layout:
     return false;
 }
 
-Interface *interface_init(Song *const song) {
+Interface *interface_init(State *const state) {
     RefList *layouts = ref_list_init();
     if (layouts == NULL) {
         return NULL;
@@ -1275,7 +257,7 @@ Interface *interface_init(Song *const song) {
         .focus = NULL,
         .focus_control = NULL};
 
-    if (!init_layouts(interface, song)) {
+    if (!init_layouts(interface, state)) {
         ref_list_free(layouts);
         free(interface);
         return NULL;
@@ -1383,7 +365,8 @@ void draw_edit_value(WINDOW *win, Interface *interface) {
     }
 
     if (interface->focus_control->type == CONTROL_TYPE_BOOL ||
-        interface->focus_control->type == CONTROL_TYPE_INT) {
+        interface->focus_control->type == CONTROL_TYPE_INT ||
+        interface->focus_control->type == CONTROL_TYPE_SELF_INT) {
         wmove(win, 15, 23);
         wprintw(win, interface->focus_control->edit_value);
     }

@@ -123,7 +123,7 @@ void arpeggio_free(Arpeggio *arpeggio);
 typedef struct {
     volatile int instrument;
     volatile int note;
-    volatile int arpegio;
+    volatile int arpeggio;
 } Step;
 
 typedef struct {

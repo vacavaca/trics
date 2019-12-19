@@ -2,7 +2,7 @@
 #define UTIL_H
 
 #include <stdbool.h> // bool
-#include "math.h" // sqrt
+#include <math.h> // sqrt
 
 int sign(int a);
 

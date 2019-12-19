@@ -131,15 +131,15 @@ void song_free(Song *song) {
 }
 
 bool state_init_defaults(State *state) {
-    if (!state_create_instrument(state, "Default")) {
+    if (state_create_instrument(state, "Default") == -1) {
         return false;
     }
 
-    if (!state_create_pattern(state)) {
+    if (state_create_pattern(state) == -1) {
         return false;
     }
 
-    if (!state_create_arpeggio(state, "Default")) {
+    if (state_create_arpeggio(state, "Default") == -1) {
         return false;
     }
 
@@ -169,7 +169,7 @@ State *state_init(char *song_name) {
 
     State *state = malloc(sizeof(State));
     if (state == NULL) {
-        goto cleanup;
+        goto cleanup_arpeggios;
     }
 
     *state = (State){
@@ -185,13 +185,21 @@ State *state_init(char *song_name) {
     return state;
 
 cleanup:
-    free(arpeggios);
+    free(state);
+cleanup_arpeggios:
+    for (int i = 0; i < arpeggios->length; i++) {
+        arpeggio_free(ref_list_get(arpeggios, i));
+    }
+    ref_list_free(arpeggios);
 cleanup_patterns:
-    free(patterns);
+    ref_list_free(patterns);
 cleanup_instruments:
-    free(instruments);
+    for (int i = 0; i < instruments->length; i++) {
+        instrument_free(ref_list_get(instruments, i));
+    }
+    ref_list_free(instruments);
 cleanup_song:
-    free(song);
+    song_free(song);
     return NULL;
 }
 

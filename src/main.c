@@ -1,11 +1,14 @@
 #include "input.h"
 #include "state.h"
-#include "ui.h"
+#include "ui_interface.h"
 #include <ncurses.h> // ncurses functions
 #include <signal.h>  // signal
+#include <stdbool.h>  // bool
 #include <termios.h> // TC constants
 #include <time.h>    // nanosleep
 #include <unistd.h>  // STDIN_FILENO
+#include <stdio.h>  // fprintf
+#include <stdlib.h>  // exit
 
 static WINDOW *win;
 
@@ -52,10 +55,13 @@ void sleep_msec(int ms) {
 }
 
 int main(int argc, char *argv[]) {
+    State *state = state_init((char *)"Song Title");
+    if (state == NULL) {
+        fprintf(stderr, "Failed to initialize state\n");
+        exit(1);
+    }
 
-    Song *song = song_init("Song Title 2334g34g");
-
-    Interface *interface = interface_init(song);
+    Interface *interface = interface_init(state);
 
     if (interface == NULL) {
         fprintf(stderr, "Failed to initialize interface\n");
@@ -103,6 +109,6 @@ cleanup:
         free_input(inputs);
     }
     interface_free(interface);
-    song_free(song);
+    state_free(state);
     return 0;
 }

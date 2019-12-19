@@ -4,10 +4,17 @@ SRC_DIR = src
 TARGET = $(BUILD_DIR)/$(BIN_NAME)
 LIBS = -lm -lncurses
 CC = gcc
+ifeq ($(BUILD), debug)
 CFLAGS = -g -Wall -Wextra -Wpedantic \
           -Wformat=2 -Wno-unused-parameter -Wshadow \
           -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
           -Wredundant-decls -Wnested-externs -Wmissing-include-dirs
+else
+CFLAGS = -Wall -Wextra -Wpedantic \
+          -Wformat=2 -Wno-unused-parameter -Wshadow \
+          -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
+          -Wredundant-decls -Wnested-externs -Wmissing-include-dirs
+endif
 
 default: $(TARGET)
 all: default
