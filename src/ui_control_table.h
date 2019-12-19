@@ -1,6 +1,7 @@
 #ifndef UI_CONTROL_TABLE_H
 #define UI_CONTROL_TABLE_H
 
+#include "state.h"      // MAX_PATTERN_VOICES
 #include "ui_base.h" // Cursor
 #include "ui_control.h" // Control
 #include "reflist.h" // RefList
@@ -23,6 +24,8 @@ typedef struct
     int focus_row;
     int focus_column;
     int offset;
+    int octaves[MAX_PATTERN_VOICES];
+    int pattern;
 } ControlTable;
 
 ControlTable *control_table_init(int column_count, int x, int y, int width,

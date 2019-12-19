@@ -24,9 +24,9 @@ ControlTable *init_song_params_table(Layout *layout, Song *const song) {
     }
 
     Control song_param_controls[3] = {
-        control_init_int(&song->bpm, false),
-        control_init_int(&song->step, false),
-        control_init_text(&song->name, 17, true),
+        control_init_int(&song->bpm, false, NULL, layout),
+        control_init_int(&song->step, false, NULL, layout),
+        control_init_text(&song->name, 17, true, NULL, layout),
     };
 
     if (!control_table_add(song_params_table, song_param_controls)) {
@@ -45,14 +45,14 @@ ControlTable *init_song_arrangement_table(Layout *layout, Song *const song) {
 
     for (int i = 0; i < 16; i++) {
         Control arrangement_row[8] = {
-            control_init_int(&song->patterns[i][0], true),
-            control_init_int(&song->patterns[i][1], true),
-            control_init_int(&song->patterns[i][2], true),
-            control_init_int(&song->patterns[i][3], true),
-            control_init_int(&song->patterns[i][4], true),
-            control_init_int(&song->patterns[i][5], true),
-            control_init_int(&song->patterns[i][6], true),
-            control_init_int(&song->patterns[i][7], true),
+            control_init_int(&song->patterns[i][0], true, NULL, layout),
+            control_init_int(&song->patterns[i][1], true, NULL, layout),
+            control_init_int(&song->patterns[i][2], true, NULL, layout),
+            control_init_int(&song->patterns[i][3], true, NULL, layout),
+            control_init_int(&song->patterns[i][4], true, NULL, layout),
+            control_init_int(&song->patterns[i][5], true, NULL, layout),
+            control_init_int(&song->patterns[i][6], true, NULL, layout),
+            control_init_int(&song->patterns[i][7], true, NULL, layout),
         };
 
         if (!control_table_add(arrangement_table, arrangement_row)) {
@@ -116,9 +116,9 @@ bool pattern_table_set_pattern(Layout const *layout, ControlTable *table,
         Control row[3 * MAX_PATTERN_VOICES];
         for (int j = 0; j < MAX_PATTERN_VOICES; j++) {
             volatile Step *step = &pattern->steps[i][j];
-            row[0 + j * 3] = control_init_int(&step->instrument, true);
-            row[1 + j * 3] = control_init_int(&step->note, true);
-            row[2 + j * 3] = control_init_int(&step->arpeggio, true);
+            row[0 + j * 3] = control_init_int(&step->instrument, true, NULL, layout);
+            row[1 + j * 3] = control_init_int(&step->note, true, NULL, layout);
+            row[2 + j * 3] = control_init_int(&step->arpeggio, true, NULL, layout);
         }
 
         if (!control_table_set(table, i, row)) {
@@ -134,7 +134,7 @@ void handle_control_select_layout(void *self) {
     Layout *layout = control->layout;
     ControlTable *pattern_table = ref_list_get(layout->tables, 1);
     pattern_table_set_pattern(layout, pattern_table,
-                              control->self_int_value - 1);
+                              *(control->control_int.value) - 1);
 }
 
 ControlTable *init_pattern_params_table(Layout *layout) {
@@ -145,9 +145,9 @@ ControlTable *init_pattern_params_table(Layout *layout) {
     }
 
     Control controls[3] = {
-        control_init_self_int(1, false, layout, handle_control_select_layout),
-        control_init_self_int(5, false, layout, NULL),
-        control_init_self_int(5, false, layout, NULL),
+        control_init_int(&table->pattern, false, handle_control_select_layout, layout),
+        control_init_int(&table->octaves[0], false, NULL, layout),
+        control_init_int(&table->octaves[0], false, NULL, layout),
     };
 
     if (!control_table_add(table, controls)) {
@@ -365,10 +365,9 @@ void draw_edit_value(WINDOW *win, Interface *interface) {
     }
 
     if (interface->focus_control->type == CONTROL_TYPE_BOOL ||
-        interface->focus_control->type == CONTROL_TYPE_INT ||
-        interface->focus_control->type == CONTROL_TYPE_SELF_INT) {
+        interface->focus_control->type == CONTROL_TYPE_INT) {
         wmove(win, 15, 23);
-        wprintw(win, interface->focus_control->edit_value);
+        // wprintw(win, control_repr(interface->focus_control));
     }
 }
 
@@ -912,7 +911,9 @@ bool handle_edit(Interface *interface, Input const *input) {
 
     if (interface->focus_control != NULL && !is_editing &&
         (input_eq(input, &test_bsp) || input_eq(input, &test_del))) {
-        return control_empty(interface->focus_control);
+        if (control_empty(interface->focus_control)) {
+            control_save_edit(interface->focus_control);
+        }
     }
 
     return false;

@@ -47,8 +47,12 @@ ControlTable *control_table_init(int column_count, int x, int y, int width,
         .focus = NULL,
         .focus_row = 0,
         .focus_column = 0,
-        .offset = 0,
+        .offset = 0
     };
+
+    for (int v = 0; v < MAX_PATTERN_VOICES; v++) {
+        table->octaves[v] = 4;
+    }
 
     return table;
 
