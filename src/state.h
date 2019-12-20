@@ -24,6 +24,11 @@
 #define MAX_SONG_LENGTH 256
 #define EMPTY 0
 #define NONE -1
+#define STATE_VARS_COUNT 8
+#define STATE_VAR_PATTERN 0
+#define STATE_VAR_INSTRUMENT 1
+#define STATE_VAR_ARPEGGIO 2
+#define STATE_VAR_TRANSPOSE 3
 
 #define INT_PARAM(n) (n + 1)
 
@@ -150,6 +155,7 @@ typedef struct {
     RefList *patterns;
     RefList *instruments;
     RefList *arpeggios;
+    int vars[STATE_VARS_COUNT];
 } State;
 
 State *state_init(char *song_name);

@@ -1,7 +1,7 @@
 #include "ui_control_table.h"
 
-ControlTable *control_table_init(int column_count, int x, int y, int width,
-                                 char const **headers) {
+ControlTable *control_table_init(int column_count, int x, int y,
+                                 int width, int height, char const **headers) {
     assert(column_count > 0);
     assert(column_count <= MAX_TABLE_COLUMNS);
 
@@ -42,17 +42,13 @@ ControlTable *control_table_init(int column_count, int x, int y, int width,
             .x = x,
             .y = y,
             .width = width,
-            .height = (table_headers != NULL ? 1 : 0),
+            .height = height,
         },
         .focus = NULL,
         .focus_row = 0,
         .focus_column = 0,
         .offset = 0
     };
-
-    for (int v = 0; v < MAX_PATTERN_VOICES; v++) {
-        table->octaves[v] = 4;
-    }
 
     return table;
 
@@ -90,7 +86,6 @@ bool control_table_add(ControlTable *table, Control const *row) {
         return false;
     }
 
-    table->rect.height += 1;
 
     return true;
 }
@@ -114,7 +109,7 @@ bool control_table_set(ControlTable *table, int n, Control const *row) {
 
     memcpy(table_row, row, size);
 
-    int y_offset = table->headers != NULL ? 1 : 0 + n;
+    int y_offset = (table->headers != NULL ? 1 : 0) + n;
     int x_offset = 0;
     for (int i = 0; i < table->column_count; i++) {
         table_row[i].rect.y = table->rect.y + y_offset;

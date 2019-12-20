@@ -49,12 +49,11 @@ typedef struct {
 
 typedef struct {
     volatile int *value;
-    int base_octave;
+    int *base_octave;
     int edit_value;
     char *edit_text;
     bool allow_empty;
     bool edit;
-    bool reseted;
 } ControlNote;
 
 typedef struct
@@ -83,7 +82,7 @@ Control control_init_int(volatile int *value, bool allow_empty,
 Control control_init_text(char **value, int width, bool allow_empty,
                           void (*on_change)(void *), void *layout);
 
-Control control_init_note(volatile int *value, int base_octave,
+Control control_init_note(volatile int *value, int *base_octave,
                           bool allow_empty, void (*on_change)(void *),
                           void *layout);
 

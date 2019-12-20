@@ -15,4 +15,10 @@ Set-up:
 
 Makefile targets:
 
-    clean   - clean everything, delete object files and target dir
+    clean     - clean everything, delete object files and target dir
+    run       - make and run
+    run-check - make and run with mem check
+
+Environment:
+    BUILD     - if set to "debug" will compile with debug symbols
+                BUILD=debug make

@@ -39,18 +39,18 @@ Available commands
                     Keyboard Layout
 
 General
-  CTRL + arrow or CTRL + h/l     - switch tab
-  or mouse click
-
-  ALT + arrow or ALT + h/l       - switch sub tab
-  or mouse click
-
   ALT + s                        - go to song tab
   ALT + p                        - go to pattern tab
   ALT + i                        - go to instrument tab
   ALT + w                        - go to wave tab
   ALT + f                        - go to filter tab
   ALT + a                        - go to arpeggio tab
+  CTRL + arrow or CTRL + h/l     - switch tab
+  or mouse click
+
+  ALT + arrow or ALT + h/l       - switch sub tab
+  or mouse click
+
   y                              - copy table row/pattern/instrument/arpeggio
   p                              - paste table row/pattern/instrument/arpeggio
   CTRL + c                       - quit
@@ -169,15 +169,15 @@ Arpeggio tab
   ## t1 t2
   00 04 04
 
-  in nt   ar   in nt   ar
-  00 C#-1 --   -- ---- --
-  00 C#-1 --   -- ---- --
-> 00 C#-1 --   -- ---- --
-  00 C#   --   -- ---- --
-  00 ==== --   -- ---- --
-  00 C#+1 --   -- ---- --
-  00 C#+2 --   -- ---- --
-  00 C#   --   -- ---- --
+  in nt  ar in nt  ar
+  00 C#1 -- -- --- --
+  00 C#1 -- -- --- --
+> 00 C#1 -- -- --- --
+  00 C#  -- -- --- --
+  00 === -- -- --- --
+  00 C#1 -- -- --- --
+  00 C#2 -- -- --- --
+  00 C#  -- -- --- --
   ...             ALT + K
 
 

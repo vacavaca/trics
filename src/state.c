@@ -131,17 +131,26 @@ void song_free(Song *song) {
 }
 
 bool state_init_defaults(State *state) {
-    if (state_create_instrument(state, "Default") == -1) {
+    if (state_create_instrument(state, "default") == -1) {
         return false;
     }
+
+    state->vars[STATE_VAR_INSTRUMENT] = 1;
 
     if (state_create_pattern(state) == -1) {
         return false;
     }
 
-    if (state_create_arpeggio(state, "Default") == -1) {
+    state->vars[STATE_VAR_PATTERN] = 1;
+    for (int i = 0; i < MAX_PATTERN_VOICES; i++) {
+        state->vars[STATE_VAR_TRANSPOSE + i] = 5;
+    }
+
+    if (state_create_arpeggio(state, "default") == -1) {
         return false;
     }
+
+    state->vars[STATE_VAR_ARPEGGIO] = 1;
 
     return true;
 }

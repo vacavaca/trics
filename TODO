@@ -1,6 +1,4 @@
-* display and edit notes 1h
 * operator control 1h
-* gaps in tables 20m
 * optimize refresh 4h
   * only on input or bar
   * refresh only restricted area
@@ -18,3 +16,4 @@
 * arpeggios ?
 * delay ?
 * reverb ?
+* linter

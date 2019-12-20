@@ -3,8 +3,8 @@
 
 RefList *ref_list_init(void) {
     const size_t item_size = sizeof(void *);
-    const size_t cap = item_size * DEFAULT_LIST_CAPACITY;
-    void **array = malloc(cap);
+    const size_t cap = DEFAULT_LIST_CAPACITY;
+    void **array = malloc(cap * item_size);
     if (array == NULL) {
         return NULL;
     }
@@ -25,9 +25,9 @@ RefList *ref_list_init(void) {
 }
 
 bool ref_list_add(RefList *list, void *item) {
-    if (list->length == list->cap) {
+    if (list->length >= list->cap) {
         const size_t next_cap = list->cap * 2;
-        void **next = realloc(list->array, next_cap);
+        void **next = realloc(list->array, next_cap * list->item_size);
         if (next == NULL) {
             return false;
         }
@@ -47,7 +47,7 @@ bool ref_list_set(RefList *list, int n, void *item) {
 
     if (n >= list->cap) {
         const size_t next_cap = list->cap * 2;
-        void **next = realloc(list->array, next_cap);
+        void **next = realloc(list->array, next_cap * list->item_size);
         if (next == NULL) {
             return false;
         }

@@ -103,10 +103,10 @@ void layout_focux_first_col_or_same(Layout *layout, int x, int y) {
 // if not exact find closest
 void layout_focus_point(Layout *layout, int x, int y, bool exact) {
     ControlTable *focus = NULL;
+    Point point = (Point){ .x = x, .y = y };
     for (int i = 0; i < layout->tables->length; i++) {
         ControlTable *table = ref_list_get(layout->tables, i);
-        if (x >= table->rect.x && x <= table->rect.x + table->rect.width &&
-            y >= table->rect.y && y <= table->rect.y + table->rect.height) {
+        if (rect_contains(&table->rect, &point)) {
             focus = table;
             break;
         }

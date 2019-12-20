@@ -17,7 +17,7 @@ bool interface_set_layout(Interface *interface, int tab, Layout *layout) {
 
 ControlTable *init_song_params_table(Layout *layout, Song *const song) {
     char const *song_params_headers[3] = {"bp", "st", "title"};
-    ControlTable *song_params_table = control_table_init(3, 2, 3, 23,
+    ControlTable *song_params_table = control_table_init(3, 2, 3, 23, 2,
                                                          song_params_headers);
     if (song_params_table == NULL) {
         return NULL;
@@ -38,12 +38,12 @@ ControlTable *init_song_params_table(Layout *layout, Song *const song) {
 }
 
 ControlTable *init_song_arrangement_table(Layout *layout, Song *const song) {
-    ControlTable *arrangement_table = control_table_init(8, 2, 6, 23, NULL);
+    ControlTable *arrangement_table = control_table_init(8, 2, 6, 23, 9, NULL);
     if (arrangement_table == NULL) {
         return NULL;
     }
 
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < MAX_SONG_LENGTH; i++) {
         Control arrangement_row[8] = {
             control_init_int(&song->patterns[i][0], true, NULL, layout),
             control_init_int(&song->patterns[i][1], true, NULL, layout),
@@ -99,26 +99,64 @@ cleanup_layout:
     return NULL;
 }
 
-bool pattern_table_set_pattern(Layout const *layout, ControlTable *table,
-                               int n) {
-    while (n >= layout->state->patterns->length) {
-        if (state_create_pattern(layout->state) == -1) {
+void pattern_table_auto_set_insrument(Layout *layout, ControlTable *table,
+                                     int x, int y) {
+    State *state = layout->state;
+    int in = state->vars[STATE_VAR_INSTRUMENT] - 1;
+    for (int i = 0; i < state->song->step - 1; i++) {
+        Control *row = ref_list_get(table->rows, i);
+        for (int j = 0; j < MAX_PATTERN_VOICES; j++) {
+            Control *control = &row[j * 3];
+            if (control->rect.y == y && control->rect.x == x - 3 &&
+                *control->control_int.value == EMPTY) {
+                *control->control_int.value = in + 1;
+            }
+        }
+    }
+}
+
+void handle_control_note_insert(void *self) {
+    Control *control = self;
+    Layout *layout = control->layout;
+    ControlTable *pattern_table = ref_list_get(layout->tables, 1);
+    pattern_table_auto_set_insrument(layout, pattern_table,
+                                     control->rect.x, control->rect.y);
+}
+
+bool pattern_table_update_pattern(Layout *layout, ControlTable *table) {
+    State *state = layout->state;
+    int n = state->vars[STATE_VAR_PATTERN] - 1;
+    while (n >= state->patterns->length) {
+        if (state_create_pattern(state) == -1) {
             return false;
         }
     }
- 
-    Pattern *pattern = state_get_pattern(layout->state, n);
+
+    Pattern *pattern = state_get_pattern(state, n);
     if (pattern == NULL) {
         return false;
     }
 
-    for (int i = 0; i < MAX_PATTERN_LENGTH; i++) {
+    int in = state->vars[STATE_VAR_INSTRUMENT] - 1;
+    Instrument *instrument = ref_list_get(state->instruments, in);
+    if (instrument == NULL) {
+        return false;
+    }
+
+    int *octave = (int *)&instrument->octave;
+
+    for (int i = 0; i < state->song->step - 1; i++) {
         Control row[3 * MAX_PATTERN_VOICES];
         for (int j = 0; j < MAX_PATTERN_VOICES; j++) {
             volatile Step *step = &pattern->steps[i][j];
-            row[0 + j * 3] = control_init_int(&step->instrument, true, NULL, layout);
-            row[1 + j * 3] = control_init_int(&step->note, true, NULL, layout);
-            row[2 + j * 3] = control_init_int(&step->arpeggio, true, NULL, layout);
+            row[0 + j * 3] = control_init_int(&step->instrument, true,
+                                              NULL, layout);
+
+            row[1 + j * 3] = control_init_note(&step->note, octave,
+                                               true, handle_control_note_insert, layout);
+
+            row[2 + j * 3] = control_init_int(&step->arpeggio, true,
+                                              NULL, layout);
         }
 
         if (!control_table_set(table, i, row)) {
@@ -129,25 +167,27 @@ bool pattern_table_set_pattern(Layout const *layout, ControlTable *table,
     return true;
 }
 
-void handle_control_select_layout(void *self) {
+void handle_control_select_pattern(void *self) {
     Control *control = self;
     Layout *layout = control->layout;
     ControlTable *pattern_table = ref_list_get(layout->tables, 1);
-    pattern_table_set_pattern(layout, pattern_table,
-                              *(control->control_int.value) - 1);
+    pattern_table_update_pattern(layout, pattern_table);
 }
 
 ControlTable *init_pattern_params_table(Layout *layout) {
     char const *headers[3] = {"##", "t1", "t2"};
-    ControlTable *table = control_table_init(3, 2, 3, 8, headers);
+    ControlTable *table = control_table_init(3, 2, 3, 8, 2, headers);
     if (table == NULL) {
         return NULL;
     }
 
+    State *state = layout->state;
+
     Control controls[3] = {
-        control_init_int(&table->pattern, false, handle_control_select_layout, layout),
-        control_init_int(&table->octaves[0], false, NULL, layout),
-        control_init_int(&table->octaves[0], false, NULL, layout),
+        control_init_int(&state->vars[STATE_VAR_PATTERN], false,
+                         handle_control_select_pattern, layout),
+        control_init_int(&state->vars[STATE_VAR_TRANSPOSE], false, NULL, layout),
+        control_init_int(&state->vars[STATE_VAR_TRANSPOSE + 1], false, NULL, layout),
     };
 
     if (!control_table_add(table, controls)) {
@@ -160,12 +200,12 @@ ControlTable *init_pattern_params_table(Layout *layout) {
 
 ControlTable *init_pattern_table(Layout *layout) {
     char const *headers[6] = {"in", "nt", "ar", "in", "nt", "ar"};
-    ControlTable *table = control_table_init(6, 2, 6, 23, headers);
+    ControlTable *table = control_table_init(6, 2, 6, 23, 9, headers);
     if (table == NULL) {
         return NULL;
     }
 
-    if (!pattern_table_set_pattern(layout, table, 0)) {
+    if (!pattern_table_update_pattern(layout, table)) {
         control_table_free(table);
         return NULL;
     }
@@ -367,7 +407,7 @@ void draw_edit_value(WINDOW *win, Interface *interface) {
     if (interface->focus_control->type == CONTROL_TYPE_BOOL ||
         interface->focus_control->type == CONTROL_TYPE_INT) {
         wmove(win, 15, 23);
-        // wprintw(win, control_repr(interface->focus_control));
+        wprintw(win, control_repr(interface->focus_control));
     }
 }
 

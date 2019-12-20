@@ -154,15 +154,17 @@ bool control_bool_empty(ControlBool *control) {
     return true;
 }
 
-void control_bool_save_edit(ControlBool* control) {
+bool control_bool_save_edit(ControlBool* control) {
     if (!control->edit) {
-        return;
+        return false;
     }
 
     free(control->edit_text);
     control->edit_text = NULL;
+    bool eq = *control->value == control->edit_value;
     *control->value = control->edit_value;
     control->edit = false;
+    return !eq;
 }
 
 void control_bool_discard_edit(ControlBool* control) {
@@ -376,15 +378,17 @@ bool control_int_empty(ControlInt *control) {
     return true;
 }
 
-void control_int_save_edit(ControlInt* control) {
+bool control_int_save_edit(ControlInt* control) {
     if (!control->edit) {
-        return;
+        return false;
     }
 
     free(control->edit_text);
     control->edit_text = NULL;
+    bool eq = *control->value == control->edit_value;
     *control->value = control->edit_value;
     control->edit = false;
+    return !eq;
 }
 
 void control_int_discard_edit(ControlInt* control) {
@@ -487,8 +491,6 @@ InputResult control_text_handle_input(ControlText *control, unsigned char key) {
         return (InputResult) { .handled = false };
     }
 
-    // TODO backspace
-
     int len = strlen(control->edit_value);
 
     if (!control->reseted) {
@@ -540,7 +542,7 @@ InputResult control_text_handle_input(ControlText *control, unsigned char key) {
 }
 
 bool control_text_empty(ControlText *control) {
-    if (!control->edit) {
+    if (!control->allow_empty) {
         return false;
     }
 
@@ -549,16 +551,23 @@ bool control_text_empty(ControlText *control) {
         return false;
     }
     next[0] = 0;
-    free(control->edit_value);
-    control->edit_value = next;
-    control->start = 0;
-    control->reseted = false;
+
+    if (control->edit) {
+        free(control->edit_value);
+        control->edit_value = next;
+        control->start = 0;
+        control->reseted = false;
+    } else {
+        free(*control->value);
+        *control->value = next;
+    }
+
     return true;
 }
 
-void control_text_save_edit(ControlText* control) {
+bool control_text_save_edit(ControlText* control) {
     if (!control->edit) {
-        return;
+        return false;
     }
 
     free(*control->value);
@@ -567,6 +576,7 @@ void control_text_save_edit(ControlText* control) {
     control->edit = false;
     control->start = 0;
     control->reseted = false;
+    return true;
 }
 
 void control_text_discard_edit(ControlText* control) {
@@ -590,25 +600,247 @@ void control_text_free(ControlText *control) {
 // ControlNote
 
 ControlNote control_note_init(volatile int *const value,
-                              int base_octave, bool allow_empty);
+                              int *base_octave, bool allow_empty) {
+    return (ControlNote){
+        .value = value,
+        .base_octave = base_octave,
+        .edit_value = *value,
+        .edit_text = NULL,
+        .allow_empty = allow_empty,
+        .edit = false
+    };
+}
 
-char *control_note_repr(ControlNote *control);
+char const *notes[12] = {
+    "C ", "C#", "D ", "D#", "E ", "F ",
+    "F#", "G ", "G#", "A ", "A#", "B "
+};
 
-bool control_note_edit(ControlNote *control);
+char *note_repr(int note, int base_octave) {
+    char *str = malloc(4);
+    if (str == NULL) {
+        return NULL;
+    }
 
-bool control_note_handle_step_input(ControlNote *control, int i);
+    if (note == EMPTY) {
+        sprintf(str, "---");
+        return str;
+    }
 
-bool control_note_handle_multiplier_input(ControlNote *control, double i);
+    if (note == NONE) {
+        sprintf(str, "===");
+        return str;
+    }
 
-InputResult control_note_handle_input(ControlNote *control, char key);
+    note -= 1;
+    int octave = note / 12;
+    int n = note - octave * 12;
 
-bool control_note_empty(Control *control);
+    if (octave != 0) {
+        sprintf(str, "%s%1d", notes[n], octave);
+    } else {
+        sprintf(str, "%s ", notes[n]);
+    }
 
-void control_note_save_edit(ControlNote* control);
+    return str;
+}
 
-void control_note_discard_edit(ControlNote* control);
+char *control_note_repr(ControlNote *control) {
+    if (control->edit) {
+        return control->edit_text;
+    } else {
+        return note_repr(*control->value, *control->base_octave);
+    }
+}
 
-void control_note_free(ControlNote *control);
+bool control_note_edit(ControlNote *control) {
+    if (control->edit) {
+        return false;
+    }
+
+    control->edit_value = *control->value;
+    control->edit_text = note_repr(control->edit_value, *control->base_octave);
+    if (control->edit_text == NULL) {
+        return false;
+    }
+    control->edit = true;
+
+    return true;
+}
+
+int clamp_note(int value, bool allow_empty) {
+    if (value < 0) {
+        value = EMPTY;
+    }
+
+    if (!allow_empty && value == EMPTY) {
+        value += 1;
+    }
+
+    if (value > 109) {
+        value = 109;
+    }
+
+    return value;
+}
+
+bool control_note_handle_step_input(ControlNote *control, int i) {
+    if (!control->edit || i == 0) {
+        return false;
+    }
+
+    int value = clamp_note(control->edit_value + i, control->allow_empty);
+
+    if (value != control->edit_value) {
+        char *prev = control->edit_text;
+        control->edit_text = note_repr(value, *control->base_octave);
+        if (control->edit_text == NULL) {
+            control->edit_text = prev;
+            return false;
+        }
+        free(prev);
+        control->edit_value = value;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+InputResult control_note_set_off(ControlNote *control) {
+    char *next = note_repr(NONE, *control->base_octave);
+    if (next == NULL) {
+        return (InputResult) { .handled = false };
+    }
+
+    free(control->edit_text);
+    control->edit_text = next;
+    control->edit_value = NONE;
+    return (InputResult) { .handled = true, .done = true };
+}
+
+InputResult control_note_set(ControlNote *control, int rel_note) {
+    int note = clamp_note(*control->base_octave * 12 + rel_note,
+                          control->allow_empty);
+    note += 1;
+    char *next = note_repr(note, *control->base_octave);
+    if (next == NULL) {
+        return (InputResult) { .handled = false };
+    }
+
+    free(control->edit_text);
+    control->edit_text = next;
+    control->edit_value = note;
+    return (InputResult) { .handled = true, .done = true };
+}
+
+InputResult control_note_handle_input(ControlNote *control, char key) {
+    if (!control->edit) {
+        return (InputResult) { .handled = false };
+    }
+
+    if (key == 'j') {
+        control_note_handle_step_input(control, -1);
+    } else if (key == 'k') {
+        control_note_handle_step_input(control, 1);
+    }
+
+    if (key == 127) {
+        if (!control->allow_empty) {
+            return (InputResult) { .handled = false };
+        }
+        char *prev =control->edit_text;
+        control->edit_text = note_repr(EMPTY, *control->base_octave);
+        if (control->edit_text == NULL) {
+            control->edit_text = prev;
+            return (InputResult) { .handled = false };
+        }
+        free(prev);
+        control->edit_value = EMPTY;
+        return (InputResult) { .handled = true };
+    }
+
+    switch (key) {
+        case 'z': return control_note_set(control, -12);
+        case 's': return control_note_set(control, -11);
+        case 'x': return control_note_set(control, -10);
+        case 'd': return control_note_set(control, -9);
+        case 'c': return control_note_set(control, -8);
+        case 'v': return control_note_set(control, -7);
+        case 'g': return control_note_set(control, -6);
+        case 'b': return control_note_set(control, -5);
+        case 'h': return control_note_set(control, -4);
+        case 'n': return control_note_set(control, -3);
+        case 'j': return control_note_set(control, -2);
+        case 'm': return control_note_set(control, -1);
+        case 'q': return control_note_set(control, 0);
+        case '2': return control_note_set(control, 1);
+        case 'w': return control_note_set(control, 2);
+        case '3': return control_note_set(control, 3);
+        case 'e': return control_note_set(control, 4);
+        case 'r': return control_note_set(control, 5);
+        case '5': return control_note_set(control, 6);
+        case 't': return control_note_set(control, 7);
+        case '6': return control_note_set(control, 8);
+        case 'y': return control_note_set(control, 9);
+        case '7': return control_note_set(control, 10);
+        case 'u': return control_note_set(control, 11);
+        case 'i': return control_note_set(control, 12);
+        case '=': return control_note_set_off(control);
+        default: return (InputResult) { .handled = false };
+    }
+}
+
+bool control_note_empty(ControlNote *control) {
+    if (!control->allow_empty) {
+        return false;
+    }
+
+    if (control->edit) {
+        char *next = note_repr(EMPTY, *control->base_octave);
+        if (next == NULL) {
+            return false;
+        }
+        free(control->edit_text);
+        control->edit_text = next;
+        control->edit_value = EMPTY;
+    } else {
+        control->edit_value = EMPTY;
+        *control->value = EMPTY;
+    }
+
+    return true;
+}
+
+bool control_note_save_edit(ControlNote* control){
+    if (!control->edit) {
+        return false;
+    }
+
+    free(control->edit_text);
+    control->edit_text = NULL;
+    bool eq = *control->value == control->edit_value;
+    *control->value = control->edit_value;
+    control->edit = false;
+    return !eq;
+}
+
+void control_note_discard_edit(ControlNote* control){
+    if (!control->edit) {
+        return;
+    }
+
+    free(control->edit_text);
+    control->edit_text = NULL;
+    control->edit_value = *control->value;
+    control->edit = false;
+}
+
+void control_note_free(ControlNote *control){
+    if (control->edit_text != NULL) {
+        free(control->edit_text);
+        control->edit_text = NULL;
+    }
+}
 
 // Control
 
@@ -651,9 +883,19 @@ Control control_init_text(char **value, int width, bool allow_empty,
         .layout = layout};
 }
 
-Control control_init_note(volatile int *value, int base_octave,
+Control control_init_note(volatile int *value, int *base_octave,
                           bool allow_empty, void (*on_change)(void *),
-                          void *layout);
+                          void *layout) {
+    return (Control){
+        .type = CONTROL_TYPE_NOTE,
+        .control_note = control_note_init(value, base_octave, allow_empty),
+        .rect = (Rect){ .x=0, .y=0, .width=3, .height=1 },
+        .focus = false,
+        .edit = false,
+        .focused_at = -1,
+        .on_change = on_change,
+        .layout = layout};
+}
 
 char *control_repr(Control *control) {
     if (control->type == CONTROL_TYPE_BOOL) {
@@ -662,6 +904,8 @@ char *control_repr(Control *control) {
         return control_int_repr(&control->control_int);
     } else if (control->type == CONTROL_TYPE_TEXT) {
         return control_text_repr(&control->control_text);
+    } else if (control->type == CONTROL_TYPE_NOTE) {
+        return control_note_repr(&control->control_note);
     }
 
     char *str = malloc(3);
@@ -728,6 +972,8 @@ void control_discard_edit(Control *control) {
         control_int_discard_edit(&control->control_int);
     } else if (control->type == CONTROL_TYPE_TEXT) {
         control_text_discard_edit(&control->control_text);
+    } else if (control->type == CONTROL_TYPE_NOTE) {
+        control_note_discard_edit(&control->control_note);
     }
 
     control->edit = false;
@@ -753,6 +999,8 @@ bool control_edit(Control *control) {
         result = control_int_edit(&control->control_int);
     } else if (control->type == CONTROL_TYPE_TEXT) {
         result = control_text_edit(&control->control_text);
+    } else if (control->type == CONTROL_TYPE_NOTE) {
+        result = control_note_edit(&control->control_note);
     }
 
     if (result) {
@@ -768,6 +1016,8 @@ bool control_handle_step_input(Control *control, int i) {
         return control_bool_handle_step_input(&control->control_bool, i);
     } else if (control->type == CONTROL_TYPE_INT) {
         return control_int_handle_step_input(&control->control_int, i);
+    } else if (control->type == CONTROL_TYPE_NOTE) {
+        return control_note_handle_step_input(&control->control_note, i);
     }
 
     return false;
@@ -788,6 +1038,8 @@ InputResult control_handle_input(Control *control, char key) {
         return control_int_handle_input(&control->control_int, key);
     } else if (control->type == CONTROL_TYPE_TEXT) {
         return control_text_handle_input(&control->control_text, key);
+    } else if (control->type == CONTROL_TYPE_NOTE) {
+        return control_note_handle_input(&control->control_note, key);
     }
 
     return (InputResult){ .handled = false };
@@ -798,6 +1050,8 @@ bool control_handle_wheel_input(Control *control, Point const *point, int i) {
         return control_bool_handle_step_input(&control->control_bool, i);
     } else if (control->type == CONTROL_TYPE_INT) {
         return control_int_handle_step_input(&control->control_int, i);
+    } else if (control->type == CONTROL_TYPE_NOTE) {
+        return control_note_handle_step_input(&control->control_note, i);
     }
 
     return false;
@@ -810,21 +1064,29 @@ bool control_empty(Control* control) {
         return control_int_empty(&control->control_int);
     } else if (control->type == CONTROL_TYPE_TEXT) {
         return control_text_empty(&control->control_text);
+    } else if (control->type == CONTROL_TYPE_NOTE) {
+        return control_note_empty(&control->control_note);
     }
 
     return false;
 }
 
 void control_save_edit(Control *control) {
+    bool updated = false;
     if (control->type == CONTROL_TYPE_BOOL) {
-        control_bool_save_edit(&control->control_bool);
+        updated = control_bool_save_edit(&control->control_bool);
     } else if (control->type == CONTROL_TYPE_INT) {
-        control_int_save_edit(&control->control_int);
+        updated = control_int_save_edit(&control->control_int);
     } else if (control->type == CONTROL_TYPE_TEXT) {
-        control_text_save_edit(&control->control_text);
+        updated = control_text_save_edit(&control->control_text);
+    } else if (control->type == CONTROL_TYPE_NOTE) {
+        updated = control_note_save_edit(&control->control_note);
     }
 
     control->edit = false;
+    if (updated && control->on_change != NULL) {
+        control->on_change(control);
+    }
 }
 
 void control_free(Control *control) {
@@ -834,575 +1096,9 @@ void control_free(Control *control) {
         control_int_free(&control->control_int);
     } else if (control->type == CONTROL_TYPE_TEXT) {
         control_text_free(&control->control_text);
-    }
-
-    control->edit = false;
-}
-
-/*
-
-Control control_init_bool(volatile bool *const value, bool allow_empty) {
-    return (Control){
-        .type = CONTROL_TYPE_BOOL,
-        .bool_value = value,
-        .focus = false,
-        .focused_at = -1,
-        .edit = false,
-        .text_edit_reseted = false,
-        .num_edit_reseted = false,
-        .allow_empty = allow_empty,
-        .edit_value = NULL,
-        .on_edit = NULL,
-        .layout = NULL,
-        .base_octave = 0,
-        .rect = (Rect){
-            .x = 0,
-            .y = 0,
-            .width = 2,
-            .height = 1,
-        }};
-}
-
-Control control_init_int(volatile int *const value, bool allow_empty) {
-    return (Control){
-        .type = CONTROL_TYPE_INT,
-        .int_value = value,
-        .focus = false,
-        .focused_at = -1,
-        .edit = false,
-        .text_edit_reseted = false,
-        .num_edit_reseted = false,
-        .allow_empty = allow_empty,
-        .edit_value = NULL,
-        .on_edit = NULL,
-        .layout = NULL,
-        .base_octave = 0,
-        .rect = (Rect){
-            .x = 0,
-            .y = 0,
-            .width = 2,
-            .height = 1}};
-}
-
-Control control_init_text(char **const value, int width, bool allow_empty) {
-    return (Control){
-        .type = CONTROL_TYPE_TEXT,
-        .text_value = value,
-        .focus = false,
-        .focused_at = -1,
-        .edit = false,
-        .text_edit_reseted = false,
-        .num_edit_reseted = false,
-        .allow_empty = allow_empty,
-        .edit_value = NULL,
-        .on_edit = NULL,
-        .layout = NULL,
-        .base_octave = 0,
-        .rect = (Rect){
-            .x = 0,
-            .y = 0,
-            .width = width,
-            .height = 1}};
-}
-
-Control control_init_note(volatile int *const value, int base_octave,
-                          bool allow_empty) {
-    return (Control){
-        .type = CONTROL_TYPE_NOTE,
-        .int_value = value,
-        .focus = false,
-        .focused_at = -1,
-        .edit = false,
-        .text_edit_reseted = false,
-        .num_edit_reseted = false,
-        .allow_empty = allow_empty,
-        .edit_value = NULL,
-        .on_edit = NULL,
-        .layout = NULL,
-        .base_octave = base_octave,
-        .rect = (Rect){
-            .x = 0,
-            .y = 0,
-            .width = 4,
-            .height = 1}};
-}
-
-Control control_init_self_int(int value, bool allow_empty, void *layout,
-                              void (*on_edit)(void *)) {
-    return (Control){
-        .type = CONTROL_TYPE_SELF_INT,
-        .self_int_value = value,
-        .focus = false,
-        .focused_at = -1,
-        .edit = false,
-        .text_edit_reseted = false,
-        .num_edit_reseted = false,
-        .allow_empty = allow_empty,
-        .edit_value = NULL,
-        .on_edit = on_edit,
-        .layout = layout,
-        .base_octave = 0,
-        .rect = (Rect){
-            .x = 0,
-            .y = 0,
-            .width = 2,
-            .height = 1}};
-}
-
-char *repr_bool(bool value) {
-    char *str = malloc(3);
-    sprintf(str, "%02x", value);
-    return str;
-}
-
-char *repr_int(int value) {
-    char *str = malloc(3);
-    if (value != EMPTY) {
-        sprintf(str, "%02x", value - 1);
-    } else {
-        sprintf(str, "--");
-    }
-    return str;
-}
-
-char *control_repr_bool(Control const *control) {
-    return repr_bool(*control->bool_value);
-}
-
-char *control_repr_int(Control const *control) {
-    if (control->type == CONTROL_TYPE_INT) {
-        return repr_int(*control->int_value);
-    } else if (control->type == CONTROL_TYPE_SELF_INT) {
-        return repr_int(control->self_int_value);
-    }
-
-    return NULL;
-}
-
-char *control_repr_text(Control const *control, bool cut, bool ellipsis) {
-    int len = strlen(*control->text_value);
-    if (len == 0) {
-        char *str = malloc(2);
-        sprintf(str, " ");
-        return str;
-    }
-
-    return text_cut(*control->text_value, control->rect.width, cut, ellipsis);
-}
-
-const char *notes[12] = {
-    "C ",
-    "C#",
-    "D ",
-    "D#",
-    "E ",
-    "F ",
-    "F#",
-    "G ",
-    "G#",
-    "A ",
-    "A#",
-    "B ",
-};
-
-char *control_repr_note(Control const *control) {
-    if (*control->int_value == EMPTY) {
-        return "----";
-    }
-    const int value = *control->int_value - 1;
-    const int octave = value / 12;
-    const int d = octave - control->base_octave;
-    const int note = value % 12;
-    char *result = malloc(4);
-    if (d != 0) {
-        sprintf(result, "%s%s%d", notes[note], d > 0 ? " " : "", d);
-    } else {
-        sprintf(result, "%s  ", notes[note]);
-    }
-
-    return result;
-}
-
-char *control_repr(Control* control, bool cut, bool ellipsis) {
-    if (control->type == CONTROL_TYPE_BOOL) {
-        return control_repr_bool(control);
-    } else if (control->type == CONTROL_TYPE_INT ||
-               control->type == CONTROL_TYPE_SELF_INT) {
-        return control_repr_int(control);
     } else if (control->type == CONTROL_TYPE_NOTE) {
-        return control_repr_note(control);
-    } else if (control->type == CONTROL_TYPE_TEXT) {
-        return control_repr_text(control, cut, ellipsis);
-    }
-
-    return NULL;
-}
-
-void control_draw(WINDOW *win, Control *control, int draw_time) {
-    int color;
-    if (control->focus || control->edit) {
-        if (control->focused_at == -1) {
-            control->focused_at = draw_time;
-        }
-
-        const int double_refresh_rate = CURSOR_BLINK_RATE_MSEC * 2;
-        if (control->edit ||
-            draw_time - control->focused_at < CURSOR_BLINK_RATE_MSEC) {
-            color = UI_COLOR_INVERSE;
-        } else if (draw_time - control->focused_at > double_refresh_rate) {
-            control->focused_at = draw_time;
-            color = UI_COLOR_INVERSE;
-        } else {
-            color = UI_COLOR_BRIGHT;
-        }
-    } else {
-        color = UI_COLOR_BRIGHT;
-    }
-
-    if (control->edit) {
-        attron(A_BOLD);
-    }
-
-    attron(COLOR_PAIR(color));
-    wmove(win, control->rect.y, control->rect.x);
-
-    if (!control->edit) {
-        char *repr = control_repr(control, true, true);
-        if (repr != NULL) {
-            wprintw(win, repr);
-            free(repr);
-        }
-    } else {
-        if (control->edit_value != NULL) {
-            char *repr = text_cut(control->edit_value, control->rect.width,
-                                  true, false);
-            if (repr != NULL) {
-                wprintw(win, "%s", repr);
-                free(repr);
-            }
-        }
-    }
-
-    attroff(COLOR_PAIR(color));
-
-    if (control->edit) {
-        attroff(A_BOLD);
-    }
-}
-
-void control_focus(Control *control) {
-    control->focus = true;
-    control->focused_at = -1;
-}
-
-void control_focus_clear(Control *control) {
-    control->focus = false;
-    if (control->edit && control->edit_value != NULL) {
-        free(control->edit_value);
-        control->edit_value = NULL;
-    }
-    control->edit = false;
-}
-
-bool control_edit(Control *control) {
-    if (control->edit) {
-        return true;
-    }
-
-    control->edit_value = control_repr(control, false, false);
-
-    control->edit = true;
-    return true;
-}
-
-void control_handle_step_input(Control *control, int i) {
-    if (i == 0) {
-        return;
-    }
-
-    bool control_bool = control->type == CONTROL_TYPE_BOOL;
-    bool control_int = control->type == CONTROL_TYPE_INT;
-    bool control_self_int = control->type == CONTROL_TYPE_SELF_INT;
-    if (control_bool || control_int || control_self_int) {
-        int value = EMPTY;
-        if (strcmp(control->edit_value,"--")) {
-            value = strtol(control->edit_value, NULL, 16);
-            if (errno != EINVAL) {
-                value += 1;
-            } else {
-                value = EMPTY;
-            }
-        }
-
-        if (control_bool) {
-            value = value + i > 1 ? 2 : 1;
-        } else {
-            value += i;
-        }
-
-        if (value <= EMPTY) {
-            value = EMPTY;
-            if (!control->allow_empty) {
-                value = 1;
-            }
-        } else if (value >= 256) {
-            value = 256;
-        }
-
-        free(control->edit_value);
-        if (control_bool) {
-            control->edit_value = repr_bool(value);
-        } else {
-            control->edit_value = repr_int(value);
-        }
-    }
-}
-
-void control_handle_multiplier_input(Control *control, double i) {
-    if (i == 1) {
-        return;
-    }
-
-    bool control_bool = control->type == CONTROL_TYPE_BOOL;
-    bool control_int = control->type == CONTROL_TYPE_INT;
-    bool control_self_int = control->type == CONTROL_TYPE_SELF_INT;
-    if (control_bool || control_int || control_self_int) {
-        int value = EMPTY;
-        if (strcmp(control->edit_value,"--")) {
-            value = strtol(control->edit_value, NULL, 16);
-            if (errno == EINVAL) {
-                value = EMPTY;
-            }
-        }
-
-        if (control_bool) {
-            value = (int)round((double)value * i) > 1 ? 2 : 1;
-        } else {
-            value = (int)round((double)value * i);
-        }
-
-        value += 1;
-
-        if (value <= EMPTY) {
-            value = EMPTY;
-            if (!control->allow_empty) {
-                value = 1;
-            }
-        } else if (value >= 256) {
-            value = 256;
-        }
-
-        free(control->edit_value);
-        if (control_bool) {
-            control->edit_value = repr_bool(value);
-        } else {
-            control->edit_value = repr_int(value);
-        }
-    }
-}
-
-InputResult control_handle_num_input(Control *control, unsigned char key) {
-    if (key == 'j') {
-        control_handle_step_input(control, -1);
-    } else if (key == 'k') {
-        control_handle_step_input(control, 1);
-    }
-
-    // non hex chars and not backspace
-    if ((key < 48 || key > 57) && (key < 97 || key > 102) && key != 127) {
-        return (InputResult) { .handled = false };
-    }
-
-    if (key == 127) {
-        if (control->allow_empty) {
-            control->edit_value[0] = '-';
-            control->edit_value[1] = '-';
-            return (InputResult) { .handled = true, .done = true };
-        } else {
-            return (InputResult) { .handled = false };
-        }
-    }
-
-    if (!control->num_edit_reseted) {
-        control->edit_value[0] = ' ';
-        control->edit_value[1] = key;
-
-        control->num_edit_reseted = true;
-        return (InputResult) { .handled = true };
-    } else {
-        control->edit_value[0] = control->edit_value[1];
-        control->edit_value[1] = key;
-        return (InputResult) { .handled = true, .done = true };
-    }
-}
-
-InputResult control_handle_text_input(Control *control, unsigned char key) {
-    // printable chars + backspace
-    if (key < 32 || key > 127) {
-        return (InputResult) { .handled = false };
-    }
-
-    int len = strlen(control->edit_value);
-    if (key == 127) {
-        int bsp = control->rect.width < len ? control->rect.width : len;
-        control->edit_value[bsp - 1] = 0;
-        if (!control->text_edit_reseted) {
-            control->text_edit_reseted = true;
-        }
-        return (InputResult) { .handled = true };
-    }
-
-    if (!control->text_edit_reseted) {
-        if (key == 127) {
-            int bsp = control->rect.width < len ? control->rect.width : len;
-            control->edit_value[bsp - 1] = 0;
-        } else {
-            free(control->edit_value);
-            control->edit_value = malloc(2);
-            sprintf(control->edit_value, "%c", key);
-        }
-        control->text_edit_reseted = true;
-    } else {
-        if (len >= control->rect.width) {
-            return (InputResult) { .handled = true, .done = true };
-        }
-
-        char *ex = realloc(control->edit_value, len + 2);
-        if (ex == NULL) {
-            return (InputResult) { .handled = false };
-        }
-        control->edit_value = ex;
-        control->edit_value[len] = key;
-        control->edit_value[len + 1] = 0;
-    }
-
-    return (InputResult) { .handled = true };
-}
-
-InputResult control_handle_input(Control *control, char key) {
-    if (control->type == CONTROL_TYPE_BOOL ||
-        control->type == CONTROL_TYPE_INT ||
-        control->type == CONTROL_TYPE_SELF_INT) {
-        return control_handle_num_input(control, key);
-    } else if (control->type == CONTROL_TYPE_TEXT) {
-        return control_handle_text_input(control, key);
-    }
-
-    return (InputResult) { .handled = false };
-}
-
-bool control_handle_wheel_input(Control *control, Point const *point, int i) {
-    if (!rect_contains(&control->rect, point)) {
-        return false;
-    }
-
-    control_handle_step_input(control, i);
-    return true;
-}
-
-void control_save_edit(Control *control) {
-    if (!control->edit) {
-        return;
-    }
-
-    if (control->edit_value != NULL) {
-        bool control_bool = control->type == CONTROL_TYPE_BOOL;
-        bool control_int = control->type == CONTROL_TYPE_INT;
-        bool control_self_int = control->type == CONTROL_TYPE_SELF_INT;
-        if (control_bool || control_int || control_self_int) {
-            if (strcmp(control->edit_value,"--")) {
-                int value = strtol(control->edit_value, NULL, 16);
-                if (errno != EINVAL) {
-                    if (control_bool) {
-                        *control->bool_value = value > 1 ? 2 : 1;
-                    } else if (control_int) {
-                        *control->int_value = value + 1;
-                    } else if (control_self_int) {
-                        control->self_int_value = value + 1;
-                    }
-                }
-            } else {
-                if (control_bool) {
-                    *control->bool_value = 0;
-                } else if (control_int) {
-                   *control->int_value = EMPTY;
-                } else if (control_self_int) {
-                   control->self_int_value = EMPTY;
-                }
-            }
-
-            free(control->edit_value);
-        } else if (control->type == CONTROL_TYPE_TEXT) {
-            free(*control->text_value);
-            *control->text_value = control->edit_value;
-        } else {
-            free(control->edit_value);
-        }
-
-        control->edit_value = NULL;
+        control_note_free(&control->control_note);
     }
 
     control->edit = false;
-    control->text_edit_reseted = false;
-    control->num_edit_reseted = false;
-
-    if (control->on_edit != NULL) {
-        control->on_edit(control);
-    }
 }
-
-void control_discard_edit(Control *control) {
-    if (!control->edit) {
-        return;
-    }
-
-    if (control->type == CONTROL_TYPE_TEXT) {
-        if (control->edit_value != NULL) {
-            free(control->edit_value);
-        }
-        control->edit_value = NULL;
-    }
-
-    control->edit = false;
-    control->text_edit_reseted = false;
-    control->num_edit_reseted = false;
-}
-
-bool control_empty(Control* control) {
-    if (!control->allow_empty) {
-        return false;
-    }
-
-    control_discard_edit(control);
-    bool control_bool = control->type == CONTROL_TYPE_BOOL;
-    bool control_int = control->type == CONTROL_TYPE_INT;
-    bool control_self_int = control->type == CONTROL_TYPE_SELF_INT;
-    if (control_bool || control_int || control_self_int) {
-        if (control_bool) {
-            *control->bool_value = EMPTY;
-        } else if (control_int) {
-            *control->int_value = EMPTY;
-        } else if (control_self_int) {
-            control->self_int_value = EMPTY;
-        }
-    } else {
-        free(*control->text_value);
-        char *val = malloc(1);
-        val[0] = 0;
-        *control->text_value = val;
-    }
-
-    if (control->on_edit != NULL) {
-        control->on_edit(control);
-    }
-
-    return true;
-}
-
-void control_free(Control *control) {
-    if (control->edit_value != NULL) {
-        free(control->edit_value);
-        control->edit_value = NULL;
-    }
-}
-*/
