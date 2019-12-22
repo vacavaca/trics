@@ -24,10 +24,12 @@ typedef struct
     int focus_row;
     int focus_column;
     int offset;
+    int highlight_row;
 } ControlTable;
 
 ControlTable *control_table_init(int column_count, int x, int y,
-                                 int width, int height, char const **headers);
+                                 int width, int height, char const **headers,
+                                 int highlight_row);
 
 bool control_table_add(ControlTable *table, Control const *row);
 

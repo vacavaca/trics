@@ -1,7 +1,8 @@
 #include "ui_control_table.h"
 
 ControlTable *control_table_init(int column_count, int x, int y,
-                                 int width, int height, char const **headers) {
+                                 int width, int height, char const **headers,
+                                 int highlight_row) {
     assert(column_count > 0);
     assert(column_count <= MAX_TABLE_COLUMNS);
 
@@ -47,8 +48,8 @@ ControlTable *control_table_init(int column_count, int x, int y,
         .focus = NULL,
         .focus_row = 0,
         .focus_column = 0,
-        .offset = 0
-    };
+        .offset = 0,
+        .highlight_row = highlight_row};
 
     return table;
 
@@ -145,6 +146,11 @@ void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
     int header_offset = table->headers != NULL ? 1 : 0;
     for (int i = 0; i < table->rows->length; i++) {
         Control *row = ref_list_get(table->rows, i);
+        bool highlight = table->highlight_row != 0 &&
+                         i % table->highlight_row == 0;
+        if (highlight) {
+            attron(A_BOLD);
+        }
         for (int j = 0; j < table->column_count; j++) {
             Control *control = &row[j];
             control->rect.y = i - table->offset + table->rect.y +
@@ -153,6 +159,10 @@ void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
                 i < table->offset + MAX_TABLE_VISIBLE_ROWS) {
                 control_draw(win, &row[j], draw_time);
             }
+        }
+
+        if (highlight) {
+            attroff(A_BOLD);
         }
     }
 

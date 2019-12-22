@@ -18,7 +18,7 @@ bool interface_set_layout(Interface *interface, int tab, Layout *layout) {
 ControlTable *init_song_params_table(Layout *layout, Song *const song) {
     char const *song_params_headers[3] = {"bp", "st", "title"};
     ControlTable *song_params_table = control_table_init(3, 2, 3, 23, 2,
-                                                         song_params_headers);
+                                                         song_params_headers, 0);
     if (song_params_table == NULL) {
         return NULL;
     }
@@ -38,7 +38,7 @@ ControlTable *init_song_params_table(Layout *layout, Song *const song) {
 }
 
 ControlTable *init_song_arrangement_table(Layout *layout, Song *const song) {
-    ControlTable *arrangement_table = control_table_init(8, 2, 6, 23, 9, NULL);
+    ControlTable *arrangement_table = control_table_init(8, 2, 6, 23, 9, NULL, 0);
     if (arrangement_table == NULL) {
         return NULL;
     }
@@ -132,7 +132,7 @@ bool pattern_table_update_pattern(Layout *layout, ControlTable *table) {
         }
     }
 
-    Pattern *pattern = state_get_pattern(state, n);
+    Pattern *pattern = ref_list_get(state->patterns, n);
     if (pattern == NULL) {
         return false;
     }
@@ -174,20 +174,56 @@ void handle_control_select_pattern(void *self) {
     pattern_table_update_pattern(layout, pattern_table);
 }
 
+void pattern_table_transpose(Layout *layout, ControlTable *table) {
+    State *state = layout->state;
+    for (int i = 0; i < state->song->step - 1; i++) {
+        Control *row = ref_list_get(table->rows, i);
+        for (int j = 0; j < MAX_PATTERN_VOICES; j++) {
+            Control *control = &row[j * 3 + 1];
+            int note = *control->control_note.value;
+            int d = 12 * (state->vars[STATE_VAR_TRANSPOSE + j] - 5);
+            if (d != 0 && note != EMPTY && note != NONE) {
+                note += d;
+                if (note <= EMPTY) {
+                    note = EMPTY;
+                }
+
+                if (note > 109) {
+                    note = 109;
+                }
+
+                *control->control_note.value = note;
+            }
+        }
+    }
+
+    for (int i = 0; i < MAX_PATTERN_VOICES; i++) {
+        state->vars[STATE_VAR_TRANSPOSE + i] = 5;
+    }
+}
+
+void handle_control_transpose(void *self) {
+    Control *control = self;
+    Layout *layout = control->layout;
+    ControlTable *pattern_table = ref_list_get(layout->tables, 1);
+    pattern_table_transpose(layout, pattern_table);
+}
+
 ControlTable *init_pattern_params_table(Layout *layout) {
     char const *headers[3] = {"##", "t1", "t2"};
-    ControlTable *table = control_table_init(3, 2, 3, 8, 2, headers);
+    State *state = layout->state;
+    ControlTable *table = control_table_init(3, 2, 3, 8, 2, headers, 0);
     if (table == NULL) {
         return NULL;
     }
 
-    State *state = layout->state;
-
     Control controls[3] = {
         control_init_int(&state->vars[STATE_VAR_PATTERN], false,
                          handle_control_select_pattern, layout),
-        control_init_int(&state->vars[STATE_VAR_TRANSPOSE], false, NULL, layout),
-        control_init_int(&state->vars[STATE_VAR_TRANSPOSE + 1], false, NULL, layout),
+        control_init_int(&state->vars[STATE_VAR_TRANSPOSE], false,
+                         handle_control_transpose, layout),
+        control_init_int(&state->vars[STATE_VAR_TRANSPOSE + 1], false,
+                         handle_control_transpose, layout),
     };
 
     if (!control_table_add(table, controls)) {
@@ -200,7 +236,7 @@ ControlTable *init_pattern_params_table(Layout *layout) {
 
 ControlTable *init_pattern_table(Layout *layout) {
     char const *headers[6] = {"in", "nt", "ar", "in", "nt", "ar"};
-    ControlTable *table = control_table_init(6, 2, 6, 23, 9, headers);
+    ControlTable *table = control_table_init(6, 2, 6, 23, 9, headers, 4);
     if (table == NULL) {
         return NULL;
     }

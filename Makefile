@@ -2,7 +2,7 @@ BIN_NAME = trics
 BUILD_DIR = build
 SRC_DIR = src
 TARGET = $(BUILD_DIR)/$(BIN_NAME)
-LIBS = -lm -lncurses
+LIBS = -lm -lncurses -lSDL2
 CC = gcc
 ifeq ($(BUILD), debug)
 CFLAGS = -g -Wall -Wextra -Wpedantic \

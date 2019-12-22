@@ -7,19 +7,20 @@
 #include <string.h>  // memcpy
 
 #define MAX_WAVE_STEPS 16
-#define MIN_WAVE_STEP 4
-#define MAX_WAVE_STEP 16
+#define MIN_WAVE_STEP 16
+#define MAX_WAVE_STEP 128
 #define MAX_FILTER_STEPS 16
-#define MIN_FILTER_STEP 4
-#define MAX_FILTER_STEP 16
-#define MAX_ARPEGGIO_STEPS 64
-#define MIN_ARPEGGIO_STEP 1
-#define MAX_ARPEGGIO_STEP 4
-#define MAX_PATTERN_LENGTH 64
+#define MIN_FILTER_STEP 16
+#define MAX_FILTER_STEP 128
+#define MAX_ARPEGGIO_STEPS 16
+#define MIN_ARPEGGIO_STEP 16
+#define MAX_ARPEGGIO_STEP 128
 #define MAX_PATTERN_VOICES 2
 #define MAX_PATTERNS 256
 #define MAX_INSTRUMENTS 256
 #define MAX_ARPEGGIOS 256
+#define MIN_PATTERN_STEP 4
+#define MAX_PATTERN_STEP 32
 #define MAX_TRACKS 8
 #define MAX_SONG_LENGTH 256
 #define EMPTY 0
@@ -29,6 +30,12 @@
 #define STATE_VAR_INSTRUMENT 1
 #define STATE_VAR_ARPEGGIO 2
 #define STATE_VAR_TRANSPOSE 3
+#define INITIAL_PW 81
+#define INITIAL_RING_MOD 12
+#define INITIAL_RING_MOD_AMOUNT 1
+#define INITIAL_HARD_SYNC 81
+#define INITIAL_RESONANCE 1
+#define INITIAL_CUTOFF 256
 
 #define INT_PARAM(n) (n + 1)
 
@@ -36,19 +43,28 @@ _Static_assert(sizeof(int) == 4, "Never gonna give you up");
 
 typedef enum {
     OPERATOR_EQ = '=',
-    OPERATOR_ADD = '+',
-    OPERATOR_QADD = '~',
+    OPERATOR_ADD = '+', // +semi = +1
+    OPERATOR_QADD = '<', // +semi/4 = +0.25
+    OPERATOR_SUB = '-', // -semi = -1
+    OPERATOR_QSUB = '>', // -semi/4 = -0.25
 } Operator;
 
-const char WAVETYPE_NOIZE;
-const char WAVETYPE_SQUARE;
-const char WAVETYPE_SAW;
-const char WAVETYPE_TRI;
+const char WAVE_FORM_NOIZE;
+const char WAVE_FORM_SQUARE;
+const char WAVE_FORM_SAW;
+const char WAVE_FORM_TRI;
 
 typedef struct {
-    volatile char types;
-    volatile bool ring_mod;
-    volatile bool hard_sync;
+    volatile char form;
+
+    volatile Operator ring_mod_operator;
+    volatile int ring_mod;
+
+    volatile Operator ring_mod_amount_operator;
+    volatile int ring_mod_amount;
+
+    volatile Operator hard_sync_operator;
+    volatile int hard_sync;
 
     volatile Operator pulse_width_operator;
     volatile int pulse_width;
@@ -62,9 +78,9 @@ typedef struct {
 } Wave;
 
 typedef enum {
-    FILTERTYPE_LP,
-    FILTERTYPE_BP,
-    FILTERTYPE_HP,
+    FILTER_TYPE_LP,
+    FILTER_TYPE_BP,
+    FILTER_TYPE_HP,
 } FilterType;
 
 typedef struct {
@@ -89,10 +105,10 @@ typedef struct {
     volatile int octave;
     volatile bool hard_restart;
 
-    volatile int amplitude_attack;
-    volatile int amplitude_decay;
-    volatile int amplitude_sustain;
-    volatile int amplitude_release;
+    volatile int attack;
+    volatile int decay;
+    volatile int sustain;
+    volatile int release;
 
     Wave wave;
     Filter filter;
@@ -133,7 +149,7 @@ typedef struct {
 
 typedef struct {
     volatile int length;
-    volatile Step steps[MAX_PATTERN_LENGTH][MAX_PATTERN_VOICES];
+    volatile Step steps[MAX_PATTERN_STEP][MAX_PATTERN_VOICES];
 } Pattern;
 
 typedef struct {
@@ -162,21 +178,9 @@ State *state_init(char *song_name);
 
 int state_create_instrument(State *state, char const *name);
 
-Instrument *state_get_instrument(State *state, int n);
-
-void state_del_instrument(State *state, int n);
-
 int state_create_pattern(State *state);
 
-Pattern *state_get_pattern(State *state, int n);
-
-void state_del_pattern(State *state, int n);
-
 int state_create_arpeggio(State *state, char const *name);
-
-Arpeggio *state_get_arpeggio(State *state, int n);
-
-void state_del_arpeggio(State *state, int n);
 
 void state_free(State *state);
 

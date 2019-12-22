@@ -10,7 +10,7 @@
 
 #define MAX_TEXT_WIDTH 24
 #define REFRESH_RATE_MSEC 32
-#define INPUT_REPR_HIDE_DELAY 600
+#define INPUT_REPR_HIDE_DELAY 0
 
 typedef enum {
     TAB_SONG,

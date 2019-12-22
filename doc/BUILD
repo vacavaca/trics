@@ -3,7 +3,7 @@ Building trics
 
 Requirements:
 
-    make, gcc, libncurses5-dev
+    make, gcc, libncurses5-dev, libsdl2-dev
 
     valgrind (used for mem checks)
 

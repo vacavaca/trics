@@ -1,6 +1,7 @@
 #include "input.h"
 #include "state.h"
 #include "ui_interface.h"
+#include "audio.h"
 #include <ncurses.h> // ncurses functions
 #include <signal.h>  // signal
 #include <stdbool.h>  // bool
@@ -60,6 +61,19 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Failed to initialize state\n");
         exit(1);
     }
+
+    AudioContext *ctx = audio_context_init(state);
+    audio_context_play(ctx, 0);
+        if(!audio_context_trigger_step(ctx, 1, EMPTY, 59 - 12 * 1, 1, 8)) {
+            printf("FAILED NOTE \n");
+        }
+    while (true) {
+
+        printf("envelopes: %d, frames: %d, buffer: %d, queue: %d\n", ctx->envelopes->length, ctx->frames->length, ctx->buffer->length, ctx->queue->length);
+        SDL_Delay(500);
+    }
+
+    return 0;
 
     Interface *interface = interface_init(state);
 

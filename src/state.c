@@ -1,12 +1,12 @@
 #include "state.h"
 
-const char WAVETYPE_NOIZE = 1;
+const char WAVE_FORM_NOIZE = 1;
 
-const char WAVETYPE_SQUARE = 1 << 1;
+const char WAVE_FORM_SQUARE = 1 << 1;
 
-const char WAVETYPE_SAW = 1 << 2;
+const char WAVE_FORM_SAW = 1 << 2;
 
-const char WAVETYPE_TRI = 1 << 3;
+const char WAVE_FORM_TRI = 1 << 3;
 
 Instrument *instrument_init(char const *name) {
     Instrument *instrument = malloc(sizeof(Instrument));
@@ -19,12 +19,12 @@ Instrument *instrument_init(char const *name) {
         .pan = 128,
         .octave = 4,
         .hard_restart = false,
-        .amplitude_attack = 2,
-        .amplitude_decay = 0,
-        .amplitude_sustain = 256,
-        .amplitude_release = 0,
-        .wave = (Wave){.repeat = true, .step = 16},
-        .filter = (Filter){.repeat = true, .step = 16}};
+        .attack = 1,
+        .decay = 1,
+        .sustain = 256,
+        .release = 10,
+        .wave = (Wave){.repeat = true, .step = 32},
+        .filter = (Filter){.repeat = true, .step = 32}};
 
     int len = strlen(name);
 
@@ -37,9 +37,26 @@ Instrument *instrument_init(char const *name) {
     memcpy(instrument->name, name, len + 1);
 
     WaveStep wave_step = (WaveStep){
-        .types = WAVETYPE_SQUARE};
+        .form = WAVE_FORM_SAW,
+        .ring_mod_operator = OPERATOR_EQ,
+        .ring_mod = 13,
+        .ring_mod_amount_operator = OPERATOR_EQ,
+        .ring_mod_amount = 1,
+        .hard_sync_operator = OPERATOR_EQ,
+        .hard_sync = 1,
+        .pulse_width_operator = OPERATOR_EQ,
+        .pulse_width = 81};
 
     instrument_set_wave_step(instrument, 0, wave_step);
+
+    FilterStep filter_step = (FilterStep){
+        .type = FILTER_TYPE_LP,
+        .resonance_operator = OPERATOR_EQ,
+        .resonance = 1,
+        .cutoff_operator = OPERATOR_EQ,
+        .cutoff = 256};
+
+    instrument_set_filter_step(instrument, 0, filter_step);
 
     return instrument;
 }
@@ -49,7 +66,7 @@ void instrument_set_wave_step(Instrument *instrument, int n, WaveStep step) {
     instrument->wave.length = n + 1;
 }
 
-void instrument_set_fitler_step(Instrument *instrument, int n,
+void instrument_set_filter_step(Instrument *instrument, int n,
                                 FilterStep step) {
     instrument->filter.steps[n] = step;
     instrument->filter.length = n + 1;
@@ -66,7 +83,7 @@ Arpeggio *arpeggio_init(char const *name) {
         return NULL;
     }
 
-    *arpeggio = (Arpeggio){.repeat = true, .step = 16};
+    *arpeggio = (Arpeggio){.repeat = true, .step = 32};
 
     int len = strlen(name);
     arpeggio->name = malloc(len + 1);
@@ -230,16 +247,6 @@ int state_create_instrument(State *state, char const *name) {
     return state->instruments->length - 1;
 }
 
-Instrument *state_get_instrument(State *state, int n) {
-    return ref_list_get(state->instruments, n);
-}
-
-void state_del_instrument(State *state, int n) {
-    if (ref_list_has(state->instruments, n)) {
-        ref_list_set(state->instruments, n, NULL);
-    }
-}
-
 int state_create_pattern(State *state) {
     if (state->patterns->length >= MAX_PATTERNS) {
         return -1;
@@ -253,16 +260,6 @@ int state_create_pattern(State *state) {
     }
 
     return state->patterns->length - 1;
-}
-
-Pattern *state_get_pattern(State *state, int n) {
-    return ref_list_get(state->patterns, n);
-}
-
-void state_del_pattern(State *state, int n) {
-    if (ref_list_has(state->patterns, n)) {
-        ref_list_set(state->patterns, n, NULL);
-    }
 }
 
 int state_create_arpeggio(State *state, char const *name) {
@@ -281,16 +278,6 @@ int state_create_arpeggio(State *state, char const *name) {
     }
 
     return state->arpeggios->length - 1;
-}
-
-Arpeggio *state_get_arpeggio(State *state, int n) {
-    return ref_list_get(state->arpeggios, n);
-}
-
-void state_del_arpeggio(State *state, int n) {
-    if (ref_list_has(state->arpeggios, n)) {
-        ref_list_set(state->arpeggios, n, NULL);
-    }
 }
 
 void state_free(State *state) {

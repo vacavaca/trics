@@ -17,7 +17,7 @@ typedef enum {
     CONTROL_TYPE_BOOL,
     CONTROL_TYPE_INT,
     CONTROL_TYPE_TEXT,
-    CONTROL_TYPE_NOTE
+    CONTROL_TYPE_NOTE,
 } ControlType;
 
 typedef struct {

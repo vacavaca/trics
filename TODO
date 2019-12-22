@@ -1,11 +1,15 @@
+* in frame all values normalized and preapared for sound gen
 * operator control 1h
 * optimize refresh 4h
   * only on input or bar
   * refresh only restricted area
-* other tab layouts 1.5h
 * instrument sound ?
+* update state.c initializers
 * playing ?
+* other tab layouts 2h
 * copy/paste 3h
+* min/max for controls, ckeck state constraints
+* first op is always =
 * recording ?
 * envelopes ?
 * wave table (shapes) ?
@@ -17,3 +21,6 @@
 * delay ?
 * reverb ?
 * linter
+* args
+* saving/loading
+* export
