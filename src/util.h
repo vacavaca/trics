@@ -6,7 +6,7 @@
 
 #define MAX(a, b) (a >= b ? a : b)
 #define MIN(a, b) (a <= b ? a : b)
-#define CLAMP(a, x, n) MIN(MAX(a, n), x)
+#define CLAMP(a, n, x) MIN(MAX(a, n), x)
 
 int sign(int a);
 

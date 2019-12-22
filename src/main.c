@@ -64,13 +64,18 @@ int main(int argc, char *argv[]) {
 
     AudioContext *ctx = audio_context_init(state);
     audio_context_play(ctx, 0);
-        if(!audio_context_trigger_step(ctx, 1, EMPTY, 59 - 12 * 1, 1, 8)) {
+    int i = 0;
+    while (true) {
+        i += 1;
+
+        if(!audio_context_trigger_step(ctx, 1, EMPTY, 59 -12 * 2  , 1, 64)) {
             printf("FAILED NOTE \n");
         }
-    while (true) {
+        printf("envelopes: %d, frames: %d, buffer: %d, queue: %d time: %f\n", ctx->envelopes->length, ctx->frames->length, ctx->buffer->length, ctx->queue->length, ctx->time);
+        SDL_Delay(1000.0 * 60.0 / 128. / 4.0);
 
-        printf("envelopes: %d, frames: %d, buffer: %d, queue: %d\n", ctx->envelopes->length, ctx->frames->length, ctx->buffer->length, ctx->queue->length);
-        SDL_Delay(500);
+
+       
     }
 
     return 0;

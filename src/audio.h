@@ -16,7 +16,7 @@
 #define ENVELOPE_MIN_ATTACK 0.002
 #define ENVELOPE_MAX_ATTACK 8
 #define ENVELOPE_MIN_DECAY 0.006
-#define ENVELOPE_MAX_DECAY 24
+#define ENVELOPE_MAX_DECAY 12
 #define ENVELOPE_MIN_RELEASE 0.006
 #define ENVELOPE_MAX_RELEASE 24
 #define MAX_VALUE 32767
@@ -41,7 +41,7 @@ typedef struct {
 } PlayingNote;
 
 typedef enum {
-    ENVELOPE_IDLE,
+    ENVELOPE_IDLE = 0,
     ENVELOPE_ATTACK,
     ENVELOPE_DECAY,
     ENVELOPE_SUSTAIN,
@@ -59,6 +59,7 @@ typedef struct {
     float value;
     int track;
     int instrument;
+    bool released;
 } EnvelopeGen;
 
 typedef struct {

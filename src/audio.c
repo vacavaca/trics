@@ -17,7 +17,8 @@ EnvelopeGen envelope_gen_init(float attack, float decay,
         .last = 0,
         .value = 0,
         .track = track,
-        .instrument = instrument};
+        .instrument = instrument,
+        .released = false};
 }
 
 EnvelopeGen envelope_gen_for_instrument(Instrument *instrument,
@@ -46,8 +47,8 @@ void envelope_gen_trigger(EnvelopeGen *gen, float time) {
         gen->state = ENVELOPE_DECAY;
         gen->value = 1.0;
     } else {
-        gen->value = gen->sustain;
         gen->state = ENVELOPE_SUSTAIN;
+        gen->value = gen->sustain;
     }
 
     gen->last = time;
@@ -63,16 +64,23 @@ float envelope_gen_calculate(EnvelopeGen *gen, float time) {
     if (gen->state == ENVELOPE_ATTACK && delta >= gen->attack) {
         if (gen->decay > 0) {
             gen->state = ENVELOPE_DECAY;
-            gen->value = 1.0;
             gen->start = time;
             gen->last = time;
         } else {
+            gen->value = gen->sustain;
             gen->state = ENVELOPE_SUSTAIN;
             gen->start = time;
             gen->last = time;
         }
     } else if (gen->state == ENVELOPE_DECAY && delta >= gen->decay) {
-        gen->state = ENVELOPE_SUSTAIN;
+        if (!gen->released) {
+            gen->state = ENVELOPE_SUSTAIN;
+        } else if (gen->value > 0) {
+            gen->state = ENVELOPE_RELEASE;
+        } else {
+            gen->state = ENVELOPE_IDLE;
+        }
+
         gen->start = time;
         gen->last = time;
     } else if (gen->state == ENVELOPE_RELEASE && delta >= gen->release) {
@@ -82,14 +90,18 @@ float envelope_gen_calculate(EnvelopeGen *gen, float time) {
     }
 
     if (gen->state == ENVELOPE_IDLE) {
+        gen->value = 0.0;
         gen->last = time;
         return 0;
     }
 
     if (gen->state == ENVELOPE_SUSTAIN) {
-        gen->value = gen->sustain;
         gen->last = time;
-        return gen->sustain;
+        return gen->value;
+    }
+
+    if (time - gen->last == 0) {
+        return gen->value;
     }
 
     float interval;
@@ -111,25 +123,27 @@ float envelope_gen_calculate(EnvelopeGen *gen, float time) {
     }
 
     const float ry = target - gen->value;
-    const float rt = gen->start + interval - gen->last;
-    const float di = (time - gen->last) / rt;
+    const float rt = (gen->start + interval - time) / interval;
+    const float dt = (time - gen->last) / interval;
 
-    const float factor = envelope_factor * di;
-    printf("%f\n", factor);
-    if (factor >= 0) {
-        gen->value += ry * factor;
-    } else {
+    if (rt <= 0.0 || dt * envelope_factor >= rt) {
         gen->value = target;
+        gen->last = time;
+        return gen->value;
     }
 
+    float prev = gen->value;
+    gen->value += (ry < 0 ? ENVELOPE_CURVE : (1.0 / ENVELOPE_CURVE)) * ry / rt * dt;
     gen->last = time;
     return gen->value;
 }
 
 void envelope_gen_release(EnvelopeGen *gen, float time) {
-    if (gen->release > 0) {
-        gen->state = ENVELOPE_RELEASE;
-        gen->value = gen->sustain;
+    if (gen->release > 0 && gen->value > 0) {
+        if (gen->state == ENVELOPE_ATTACK || gen->state == ENVELOPE_SUSTAIN ||
+            (gen->state == ENVELOPE_DECAY && time - gen->start > gen->decay)) {
+            gen->state = ENVELOPE_RELEASE;
+        }
     } else {
         gen->state = ENVELOPE_IDLE;
         gen->value = 0;
@@ -137,12 +151,14 @@ void envelope_gen_release(EnvelopeGen *gen, float time) {
 
     gen->last = time;
     gen->start = time;
+    gen->released = true;
 }
 
 void envelope_gen_reset(EnvelopeGen *gen) {
     gen->last = 0;
     gen->start = 0;
     gen->value = 0;
+    gen->released = false;
     gen->state = ENVELOPE_IDLE;
 }
 
@@ -281,7 +297,7 @@ bool audio_context_trigger_step(AudioContext *ctx, int instrument,
         .arpeggio = arpeggio,
         .note = note,
         .track = track,
-        .time = 0,
+        .time = ctx->time,
         .state = NOTE_STATE_TRIGGER};
 
     PlayingNote *release = malloc(sizeof(PlayingNote));
@@ -297,7 +313,7 @@ bool audio_context_trigger_step(AudioContext *ctx, int instrument,
         .note = note,
         .track = track,
         .song_note = false,
-        .time = end,
+        .time = ctx->time + end,
         .state = NOTE_STATE_RELEASE};
 
     pthread_mutex_lock(&ctx->queue_mutex);
@@ -327,6 +343,7 @@ bool audio_context_trigger_step(AudioContext *ctx, int instrument,
     return true;
 
 cleanup:
+    pthread_mutex_unlock(&ctx->queue_mutex);
     free(release);
 cleanup_trigger:
     free(trigger);
@@ -372,6 +389,7 @@ void audio_context_stop(AudioContext *ctx) {
         }
     }
 
+    pthread_mutex_lock(&ctx->queue_mutex);
     for (int i = 0; i < ctx->queue->length; i++) {
         PlayingNote *note = ref_list_get(ctx->queue, i);
         if (note->song_note) {
@@ -379,6 +397,7 @@ void audio_context_stop(AudioContext *ctx) {
             ref_list_del(ctx->queue, i);
         }
     }
+    pthread_mutex_unlock(&ctx->queue_mutex);
 }
 
 void audio_context_free(AudioContext *ctx) {
@@ -459,10 +478,12 @@ void audio_context_offset_time(AudioContext *ctx, float offset) {
         note->time -= offset;
     }
 
+    pthread_mutex_lock(&ctx->queue_mutex);
     for(int i = 0; i < ctx->queue->length; i ++) {
         PlayingNote *note = ref_list_get(ctx->queue, i);
         note->time -= offset;
     }
+    pthread_mutex_unlock(&ctx->queue_mutex);
 }
 
 bool audio_context_fill_buffer(AudioContext *ctx) {
@@ -472,6 +493,7 @@ bool audio_context_fill_buffer(AudioContext *ctx) {
         if (last->time > ctx->time) {
             int dst = round((last->time - ctx->time) * SAMPLE_RATE);
             ctx->update_buffer_at = ctx->sample_pos + dst - 1;
+            pthread_mutex_unlock(&ctx->queue_mutex);
             return false;
         }
     }
@@ -479,12 +501,14 @@ bool audio_context_fill_buffer(AudioContext *ctx) {
     bool updated = false;
     while(ctx->queue->length > 0) {
         PlayingNote *note = ref_list_pop(ctx->queue);
+        EnvelopeGen *gen = audio_context_get_envelope(ctx, note->track,
+                                                      note->instrument);
         if (note->time <= ctx->time) {
-            EnvelopeGen *gen = audio_context_get_envelope(ctx, note->track,
-                                                          note->instrument);
             if (note->state == NOTE_STATE_TRIGGER) {
+                audio_context_release_note_buffer(ctx, note->track, note->instrument, false);
                 note->state = NOTE_STATE_PLAY;
                 ref_list_add(ctx->buffer, note);
+                envelope_gen_reset(gen);
                 envelope_gen_trigger(gen, note->time);
                 updated = true;
             } else if (note->state == NOTE_STATE_RELEASE) {
@@ -500,7 +524,6 @@ bool audio_context_fill_buffer(AudioContext *ctx) {
     }
 
     pthread_mutex_unlock(&ctx->queue_mutex);
-
     return updated;
 }
 
@@ -803,13 +826,15 @@ bool audio_context_update_play_buffers(AudioContext *ctx) {
 }
 
 
-void audio_context_release_note_buffer(AudioContext *ctx, int tn, int in) {
-    for (int i = 0; i < ctx->envelopes->length; i ++) {
-        EnvelopeGen *gen = ref_list_get(ctx->envelopes, i);
-        if (gen->track == tn && gen->instrument == in) {
-            free(gen);
-            ref_list_del(ctx->envelopes, i);
-            break;
+void audio_context_release_note_buffer(AudioContext *ctx, int tn, int in, bool del_envelope) {
+    if (del_envelope) {
+        for (int i = 0; i < ctx->envelopes->length; i ++) {
+            EnvelopeGen *gen = ref_list_get(ctx->envelopes, i);
+            if (gen->track == tn && gen->instrument == in) {
+                free(gen);
+                ref_list_del(ctx->envelopes, i);
+                break;
+            }
         }
     }
 
@@ -849,8 +874,21 @@ inline static float saw_wave(float x) {
 }
 
 inline static float square_wave(float pw, float x) {
-    float df = x - 0.25;
-    return df < (1.0 - pw) ? 0.0 : MAX_VALUE;
+    const float o = 0.205026489;
+    float pws = o;
+    if (pws > 1.0) {
+        pws -= 1;
+    }
+    float pwe = o + pw;
+    if (pwe > 1.0) {
+        pwe -= 1;
+    }
+    if (pwe < pws) {
+        pwe += pws;
+        pws = pwe - pws;
+        pwe = pwe - pws;
+    }
+    return x >= pws && x < pwe ? 0.0 : MAX_VALUE;
 }
 
 inline static float tri_wave(float x) {
@@ -920,10 +958,9 @@ inline static float note_freq(float note) {
 }
 
 inline static Output single_voice(AudioContext *ctx, Frame *frame, int nv,
-                                  float detune, float separation) {
+                                  float detune, float separation, float offset) {
     int tn = frame->track;
     int in = frame->instrument;
-
 
     Instrument *instrument = ref_list_get(ctx->state->instruments, in - 1);
     EnvelopeGen *envelope = audio_context_get_envelope(ctx, tn, in);
@@ -939,8 +976,8 @@ inline static Output single_voice(AudioContext *ctx, Frame *frame, int nv,
     // phases
     float cycle_len_l = (float)SAMPLE_RATE / (freq - detune);
     float cycle_len_r = (float)SAMPLE_RATE / (freq + detune);
-    float tl = (float)ctx->sample_pos / cycle_len_l - separation;
-    float tr = (float)ctx->sample_pos / cycle_len_r + separation;
+    float tl = (float)ctx->sample_pos / cycle_len_l + separation + offset;
+    float tr = (float)ctx->sample_pos / cycle_len_r - separation + offset;
     float xl = tl - floor(tl);
     float xr = tr - floor(tr);
 
@@ -950,7 +987,7 @@ inline static Output single_voice(AudioContext *ctx, Frame *frame, int nv,
     float yr = wave(ctx, frame->track, nvr, frame->wave.form,
                     (frame->wave.pulse_width - 1) / 255, xr);
 
-    // attenuation
+    // envelope
     float e = envelope_gen_calculate(envelope, ctx->time);
 
     yl *= vol * e;
@@ -970,17 +1007,17 @@ inline static Output single_voice(AudioContext *ctx, Frame *frame, int nv,
 
 inline static Output instrument_voice(AudioContext *ctx, Frame *frame) {
 
-    Output first = single_voice(ctx, frame, 0, WIDENING_DETUNE / 2,
-                                WIDENING_OFFSET / 2);
+    Output first = single_voice(ctx, frame, 0, 0,
+                                WIDENING_OFFSET / 2, -0.224);
     Output second = single_voice(ctx, frame, 1, WIDENING_DETUNE,
-                                 WIDENING_OFFSET);
+                                 WIDENING_OFFSET, 0.0);
 
     int tn = frame->track;
     int in = frame->instrument;
     EnvelopeGen *envelope = audio_context_get_envelope(ctx, tn, in);
 
     if (envelope->state == ENVELOPE_IDLE) {
-        audio_context_release_note_buffer(ctx, tn, in);
+        audio_context_release_note_buffer(ctx, tn, in, true);
     }
 
     // TODO FX
@@ -1011,7 +1048,7 @@ void typed_audio_callback(AudioContext *ctx, short* stream, int len) {
         stream[i * 2 + 1] = mix.right;
     }
 
-    if (ctx->time > 600) {
-        audio_context_offset_time(ctx, 600);
+    if (ctx->time > 6) {
+        audio_context_offset_time(ctx, 6);
     }
 }

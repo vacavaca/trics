@@ -20,9 +20,9 @@ Instrument *instrument_init(char const *name) {
         .octave = 4,
         .hard_restart = false,
         .attack = 1,
-        .decay = 1,
-        .sustain = 256,
-        .release = 10,
+        .decay = 10,
+        .sustain = 1,
+        .release = 1,
         .wave = (Wave){.repeat = true, .step = 32},
         .filter = (Filter){.repeat = true, .step = 32}};
 
@@ -45,7 +45,7 @@ Instrument *instrument_init(char const *name) {
         .hard_sync_operator = OPERATOR_EQ,
         .hard_sync = 1,
         .pulse_width_operator = OPERATOR_EQ,
-        .pulse_width = 81};
+        .pulse_width = 128};
 
     instrument_set_wave_step(instrument, 0, wave_step);
 
