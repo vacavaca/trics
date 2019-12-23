@@ -65,18 +65,30 @@ int main(int argc, char *argv[]) {
     AudioContext *ctx = audio_context_init(state);
     audio_context_play(ctx, 0);
     int i = 0;
+    int fu = 0;
+    int bu = 0;
+    float delay = 60.0 / 128. / 0.5;
     while (true) {
         i += 1;
 
         if(!audio_context_trigger_step(ctx, 1, EMPTY, 59 -12 * 2  , 1, 64)) {
             printf("FAILED NOTE \n");
         }
-        printf("envelopes: %d, frames: %d, buffer: %d, queue: %d time: %f\n", ctx->envelopes->length, ctx->frames->length, ctx->buffer->length, ctx->queue->length, ctx->time);
-        SDL_Delay(1000.0 * 60.0 / 128. / 4.0);
+        int dbu = ctx->buffer_update_count - bu;
+        int dfu = ctx->frames_update_count - fu;
+        bu = ctx->buffer_update_count;
+        fu = ctx->frames_update_count;
+        printf("buffer: %d, queue: %d time: %f base_rate: %f  bu/s: %f  fu/s: %f\n", ctx->buffer->length, ctx->queue->length, ctx->time, 1 / delay, dbu / delay, dfu / delay);
+        SDL_Delay(1000.0 * delay);
 
+        if (i > 1000) {
+            break;
+        }
 
        
     }
+
+    printf("b %d  f %d\n", ctx->buffer_update_count, ctx->frames_update_count);
 
     return 0;
 

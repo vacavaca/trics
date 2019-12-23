@@ -25,22 +25,6 @@
 #define WIDENING_OSCILLATORS 4
 
 typedef enum {
-    NOTE_STATE_TRIGGER,
-    NOTE_STATE_PLAY,
-    NOTE_STATE_RELEASE,
-} NoteState;
-
-typedef struct {
-    int instrument;
-    int arpeggio;
-    int note;
-    int track;
-    bool song_note;
-    float time;
-    NoteState state;
-} PlayingNote;
-
-typedef enum {
     ENVELOPE_IDLE = 0,
     ENVELOPE_ATTACK,
     ENVELOPE_DECAY,
@@ -57,10 +41,14 @@ typedef struct {
     float start;
     float last;
     float value;
-    int track;
-    int instrument;
     bool released;
 } EnvelopeGen;
+
+typedef enum {
+    NOTE_STATE_TRIGGER,
+    NOTE_STATE_PLAY,
+    NOTE_STATE_RELEASE,
+} NoteState;
 
 typedef struct {
     int sample_pos;
@@ -93,9 +81,6 @@ typedef struct {
 } ArpeggioFrame;
 
 typedef struct {
-    int track;
-    int instrument;
-    void *prev;
     WaveFrame wave;
     FilterFrame filter;
     bool play_arpeggio;
@@ -105,27 +90,32 @@ typedef struct {
     };
 } Frame;
 
+typedef struct {
+    int instrument;
+    int track;
+    int arpeggio;
+    int note;
+    bool song_note;
+    float time;
+    NoteState state;
+    EnvelopeGen *envelope;
+    Frame *frame;
+    Instrument *instrument_ref;
+} PlayingNote;
+
 // queue  - queue with future note trigger and release events
 //          updates on song start, and on keyboard presses
 //          updates are pushed from play function
 //
 // buffer - play buffer, contains notes which are currently playing
 //          updates when notes are pressed or playing in the pattern
-//          (up to ~ 18 Gz)
+//          (up to ~ 34 Gz)
 //          updates are pulled from the audio_callback
 //          clears after notes envelopes go idle
 //
-// frames - frame buffer, contains information about currently playing wave
-//          filter and arpeggio steps
-//          updates often (up to ~70 Gz)
-//          updates are pulled from the audio_callback
-//          clears after notes envelopes go idle
-//
-// ui/song -(note|event)-> queue -> buffer => frames ~~~-> samples
+// ui/song -(note|event)-> queue -> buffer => ~~~-> samples
 typedef struct {
     State *state;
-    RefList *envelopes;
-    RefList *frames;
     RefList *buffer;
     RefList *queue;
     float noize_values
@@ -139,7 +129,10 @@ typedef struct {
     volatile bool playing;
     volatile int update_buffer_at;
     volatile int update_frames_at;
+    pthread_mutex_t update_request_mutex;
     pthread_mutex_t queue_mutex;
+    volatile int frames_update_count;
+    volatile int buffer_update_count;
 } AudioContext;
 
 AudioContext *audio_context_init(State *state);

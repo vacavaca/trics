@@ -677,8 +677,8 @@ int clamp_note(int value, bool allow_empty) {
         value += 1;
     }
 
-    if (value > 109) {
-        value = 109;
+    if (value > MAX_NOTE) {
+        value = MAX_NOTE;
     }
 
     return value;

@@ -20,9 +20,9 @@ Instrument *instrument_init(char const *name) {
         .octave = 4,
         .hard_restart = false,
         .attack = 1,
-        .decay = 10,
-        .sustain = 1,
-        .release = 1,
+        .decay = 1,
+        .sustain = 256,
+        .release = 14,
         .wave = (Wave){.repeat = true, .step = 32},
         .filter = (Filter){.repeat = true, .step = 32}};
 
@@ -48,6 +48,21 @@ Instrument *instrument_init(char const *name) {
         .pulse_width = 128};
 
     instrument_set_wave_step(instrument, 0, wave_step);
+
+    /*
+    wave_step = (WaveStep){
+        .form = WAVE_FORM_SQUARE,
+        .ring_mod_operator = OPERATOR_EQ,
+        .ring_mod = 13,
+        .ring_mod_amount_operator = OPERATOR_EQ,
+        .ring_mod_amount = 1,
+        .hard_sync_operator = OPERATOR_EQ,
+        .hard_sync = 1,
+        .pulse_width_operator = OPERATOR_EQ,
+        .pulse_width = 128};
+
+    instrument_set_wave_step(instrument, 1, wave_step);
+    */
 
     FilterStep filter_step = (FilterStep){
         .type = FILTER_TYPE_LP,

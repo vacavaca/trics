@@ -5,8 +5,7 @@
 const float envelope_factor = 1.0 + (1.0 - (1.0 / ENVELOPE_CURVE));
 
 EnvelopeGen envelope_gen_init(float attack, float decay,
-                              float sustain, float release,
-                              int track, int instrument) {
+                              float sustain, float release) {
     return (EnvelopeGen){
         .attack = attack,
         .decay = decay,
@@ -16,13 +15,10 @@ EnvelopeGen envelope_gen_init(float attack, float decay,
         .start = 0,
         .last = 0,
         .value = 0,
-        .track = track,
-        .instrument = instrument,
         .released = false};
 }
 
-EnvelopeGen envelope_gen_for_instrument(Instrument *instrument,
-                                        int tn, int in) {
+EnvelopeGen envelope_gen_for_instrument(Instrument *instrument) {
     const float attack = ((float) instrument->attack - 1) / 255 *
                          (ENVELOPE_MAX_ATTACK - ENVELOPE_MIN_ATTACK) +
                          ENVELOPE_MIN_ATTACK;
@@ -36,7 +32,7 @@ EnvelopeGen envelope_gen_for_instrument(Instrument *instrument,
                           (ENVELOPE_MAX_RELEASE - ENVELOPE_MIN_RELEASE) +
                           ENVELOPE_MIN_RELEASE;
 
-    return envelope_gen_init(attack, decay, sustain, release, tn, in);
+    return envelope_gen_init(attack, decay, sustain, release);
 }
 
 void envelope_gen_trigger(EnvelopeGen *gen, float time) {
@@ -132,7 +128,6 @@ float envelope_gen_calculate(EnvelopeGen *gen, float time) {
         return gen->value;
     }
 
-    float prev = gen->value;
     gen->value += (ry < 0 ? ENVELOPE_CURVE : (1.0 / ENVELOPE_CURVE)) * ry / rt * dt;
     gen->last = time;
     return gen->value;
@@ -162,6 +157,45 @@ void envelope_gen_reset(EnvelopeGen *gen) {
     gen->state = ENVELOPE_IDLE;
 }
 
+// Playinh note
+
+PlayingNote *playing_note_init(State *state, int instrument, int track,
+                               int arpeggio, int note, bool song_note,
+                               float time, bool trigger) {
+    PlayingNote *playing_note = malloc(sizeof(PlayingNote));
+    if (playing_note == NULL) {
+        return NULL;
+    }
+
+    Instrument *instrument_ref = ref_list_get(state->instruments, instrument);
+
+    *playing_note = (PlayingNote){
+        .instrument = instrument,
+        .track = track,
+        .arpeggio = arpeggio,
+        .note = note,
+        .song_note = song_note,
+        .time = time,
+        .state = trigger ? NOTE_STATE_TRIGGER : NOTE_STATE_RELEASE,
+        .envelope = NULL,
+        .frame = NULL,
+        .instrument_ref = instrument_ref};
+
+    return playing_note;
+}
+
+void playing_note_free(PlayingNote *note) {
+    if (note->envelope != NULL) {
+        free(note->envelope);
+    }
+
+    if (note->frame != NULL) {
+        free(note->frame);
+    }
+
+    free(note);
+}
+
 // AudioContext
 
 void typed_audio_callback(AudioContext *ctx, short* stream, int len);
@@ -178,19 +212,9 @@ void audio_callback(void *ctx, Uint8* stream, int bytes) {
 }
 
 AudioContext *audio_context_init(State *state) {
-    RefList *envelopes = ref_list_init();
-    if (envelopes == NULL) {
-        return NULL;
-    }
-
-    RefList *frames = ref_list_init();
-    if (frames == NULL) {
-        goto cleanup_envelopes;
-    }
-
     RefList *buffer = ref_list_init();
     if (buffer == NULL) {
-        goto cleanup_frames;
+        return NULL;
     }
 
     RefList *queue = ref_list_init();
@@ -214,8 +238,6 @@ AudioContext *audio_context_init(State *state) {
 
     *ctx = (AudioContext){
         .state = state,
-        .envelopes = envelopes,
-        .frames = frames,
         .buffer = buffer,
         .queue = queue,
         .spec = spec,
@@ -224,9 +246,12 @@ AudioContext *audio_context_init(State *state) {
         .start_bar = 0,
         .start_time = 0,
         .playing = false,
-        .update_buffer_at = 0,
-        .update_frames_at = 0,
-        .queue_mutex = PTHREAD_MUTEX_INITIALIZER};
+        .update_buffer_at = -1,
+        .update_frames_at = -1,
+        .update_request_mutex = PTHREAD_MUTEX_INITIALIZER,
+        .queue_mutex = PTHREAD_MUTEX_INITIALIZER,
+        .frames_update_count = 0,
+        .buffer_update_count = 0};
 
     for (int i = 0; i < MAX_TRACKS * MAX_PATTERN_VOICES + 1; i ++) {
         for (int j = 0; j < WIDENING_OSCILLATORS; j++) {
@@ -247,13 +272,46 @@ cleanup_queue:
     ref_list_free(queue);
 cleanup_buffer:
     ref_list_free(buffer);
-cleanup_frames:
-    ref_list_free(frames);
-cleanup_envelopes:
-    ref_list_free(envelopes);
     return NULL;
 }
 
+inline static void audio_context_request_buffer_update(AudioContext *ctx, int at) {
+    if (at == ctx->update_buffer_at) {
+        return;
+    }
+
+    pthread_mutex_lock(&ctx->update_request_mutex);
+    if (ctx->update_buffer_at != -1) {
+        ctx->update_buffer_at = MIN(ctx->update_buffer_at, at);
+    } else {
+        ctx->update_buffer_at = at;
+    }
+    pthread_mutex_unlock(&ctx->update_request_mutex);
+}
+
+inline static void audio_context_request_frames_update(AudioContext *ctx, int at) {
+    if (at == ctx->update_frames_at) {
+        return;
+    }
+
+    pthread_mutex_lock(&ctx->update_request_mutex);
+    if (ctx->update_frames_at != -1) {
+        ctx->update_frames_at = MIN(ctx->update_frames_at, at);
+    } else {
+        ctx->update_frames_at = at;
+    }
+    pthread_mutex_unlock(&ctx->update_request_mutex);
+}
+
+inline static bool audio_context_need_buffer_update(AudioContext *ctx) {
+    int at = ctx->update_buffer_at;
+    return at != -1 && ctx->sample_pos >= at;
+}
+
+inline static bool audio_context_need_frames_update(AudioContext *ctx) {
+    int at = ctx->update_frames_at;
+    return at != -1 && ctx->sample_pos >= at;
+}
 
 bool audio_context_fill_queue(AudioContext *ctx) {
     // TODO
@@ -270,13 +328,13 @@ void audio_context_play(AudioContext *ctx, int start_bar) {
     ctx->start_time = ctx->time;
     ctx->playing = true;
 
-    // request to update buffers immediately
-    ctx->update_buffer_at = 0;
-    ctx->update_frames_at = 0;
+    audio_context_request_buffer_update(ctx, 0);
 
     audio_context_fill_queue(ctx);
     SDL_PauseAudio(false);
 }
+
+int track = 0;
 
 bool audio_context_trigger_step(AudioContext *ctx, int instrument,
                                 int arpeggio, int note, int step,
@@ -285,36 +343,26 @@ bool audio_context_trigger_step(AudioContext *ctx, int instrument,
         return false;
     }
 
-    PlayingNote *trigger = malloc(sizeof(PlayingNote));
+//    int track = MAX_TRACKS * MAX_PATTERN_VOICES; // last solo track
+
+    track += 1;
+    track %= 16;
+
+    arpeggio = arpeggio == EMPTY ? EMPTY : arpeggio - 1;
+
+    PlayingNote *trigger = playing_note_init(ctx->state, instrument - 1, track, arpeggio, note - 1,
+                                             false, ctx->time, true);
     if (trigger == NULL) {
         return false;
     }
 
-    int track = MAX_TRACKS * MAX_PATTERN_VOICES; // last solo track
-
-    *trigger = (PlayingNote){
-        .instrument = instrument,
-        .arpeggio = arpeggio,
-        .note = note,
-        .track = track,
-        .time = ctx->time,
-        .state = NOTE_STATE_TRIGGER};
-
-    PlayingNote *release = malloc(sizeof(PlayingNote));
+    float whole = 4.0 * 60.0 / ((float)(ctx->state->song->bpm - 1));
+    float end = ctx->time + whole * step / step_div;
+    PlayingNote *release = playing_note_init(ctx->state, instrument - 1, track, arpeggio, note - 1,
+                                             false, end, false);
     if (release == NULL) {
         goto cleanup_trigger;
     }
-
-    float whole = 4.0 * 60.0 / ((float)(ctx->state->song->bpm - 1));
-    float end = whole * step / step_div;
-    *release = (PlayingNote){
-        .instrument = instrument,
-        .arpeggio = arpeggio,
-        .note = note,
-        .track = track,
-        .song_note = false,
-        .time = ctx->time + end,
-        .state = NOTE_STATE_RELEASE};
 
     pthread_mutex_lock(&ctx->queue_mutex);
 
@@ -322,9 +370,8 @@ bool audio_context_trigger_step(AudioContext *ctx, int instrument,
         goto cleanup;
     }
 
-    int i = ctx->queue->length - 2;
-
     // TODO bin search
+    int i = ctx->queue->length - 2;
     for (;i >= 0; i--) {
         PlayingNote *ex = ref_list_get(ctx->queue, i);
         if (ex->time > release->time) {
@@ -336,17 +383,18 @@ bool audio_context_trigger_step(AudioContext *ctx, int instrument,
         goto cleanup;
     }
 
-    pthread_mutex_unlock(&ctx->queue_mutex);
+    // update immediatelly
+    audio_context_request_buffer_update(ctx, ctx->sample_pos);
 
-    ctx->update_buffer_at = 0; // update immediatelly
+    pthread_mutex_unlock(&ctx->queue_mutex);
 
     return true;
 
 cleanup:
     pthread_mutex_unlock(&ctx->queue_mutex);
-    free(release);
+    playing_note_free(release);
 cleanup_trigger:
-    free(trigger);
+    playing_note_free(trigger);
     return false;
 }
 
@@ -361,67 +409,39 @@ void audio_context_stop(AudioContext *ctx) {
     ctx->sample_pos = 0;
     ctx->start_time = 0;
 
+    // never update
+    audio_context_request_buffer_update(ctx, -1);
+    audio_context_request_frames_update(ctx, -1);
+
     for (int i = 0; i < ctx->buffer->length; i++) {
         PlayingNote *note = ref_list_get(ctx->buffer, i);
         if (note->song_note) {
-            for (int j = 0; j < ctx->envelopes->length; j ++) {
-                EnvelopeGen *gen = ref_list_get(ctx->envelopes, j);
-                if (gen->track == note->track &&
-                    gen->instrument == note->instrument) {
-                    free(gen);
-                    ref_list_del(ctx->envelopes, j);
-                    break;
-                }
-            }
-
-            for (int j = 0; j < ctx->frames->length; j ++) {
-                Frame *frame = ref_list_get(ctx->frames, j);
-                if (frame->track == note->track &&
-                    frame->instrument == note->instrument) {
-                    free(frame);
-                    ref_list_del(ctx->frames, j);
-                    break;
-                }
-            }
-
-            free(note);
+            playing_note_free(note);
             ref_list_del(ctx->buffer, i);
+            i -= 1;
         }
     }
 
     pthread_mutex_lock(&ctx->queue_mutex);
+
     for (int i = 0; i < ctx->queue->length; i++) {
         PlayingNote *note = ref_list_get(ctx->queue, i);
         if (note->song_note) {
-            free(note);
+            playing_note_free(note);
             ref_list_del(ctx->queue, i);
+            i -= 1;
         }
     }
+
     pthread_mutex_unlock(&ctx->queue_mutex);
 }
 
 void audio_context_free(AudioContext *ctx) {
     SDL_CloseAudio();
-    for (int i = 0; i < ctx->envelopes->length; i++) {
-        EnvelopeGen *e = ref_list_get(ctx->envelopes, i);
-        if (e != NULL) {
-            free(e);
-        }
-    }
-    ref_list_free(ctx->envelopes);
-
-    for (int i = 0; i < ctx->frames->length; i++) {
-        Frame *f = ref_list_get(ctx->frames, i);
-        if (f != NULL) {
-            free(f);
-        }
-    }
-    ref_list_free(ctx->frames);
-
     for (int i = 0; i < ctx->buffer->length; i++) {
         PlayingNote *n = ref_list_get(ctx->buffer, i);
         if (n != NULL) {
-            free(n);
+            playing_note_free(n);
         }
     }
     ref_list_free(ctx->buffer);
@@ -429,35 +449,12 @@ void audio_context_free(AudioContext *ctx) {
     for (int i = 0; i < ctx->queue->length; i++) {
         PlayingNote *n = ref_list_get(ctx->queue, i);
         if (n != NULL) {
-            free(n);
+            playing_note_free(n);
         }
     }
     ref_list_free(ctx->queue);
 
     free(ctx);
-}
-
-EnvelopeGen *audio_context_get_envelope(AudioContext *ctx, int tn, int in) {
-    // TODO optimize me
-    for (int i = 0; i < ctx->envelopes->length; i --) {
-        EnvelopeGen *e = ref_list_get(ctx->envelopes, i);
-        if (e->track == tn && e->instrument == in) {
-            return e;
-        }
-    }
-
-    Instrument *instrument = ref_list_get(ctx->state->instruments, in - 1);
-    EnvelopeGen *e = malloc(sizeof(EnvelopeGen));
-    if (e == NULL) {
-        return NULL;
-    }
-    *e = envelope_gen_for_instrument(instrument, tn, in);
-    if (!ref_list_add(ctx->envelopes, e)) {
-        free(e);
-        return NULL;
-    }
-
-    return e;
 }
 
 void audio_context_offset_time(AudioContext *ctx, float offset) {
@@ -467,58 +464,90 @@ void audio_context_offset_time(AudioContext *ctx, float offset) {
 
     ctx->start_time -= offset;
     ctx->time -= offset;
-    for(int i = 0; i < ctx->envelopes->length; i ++) {
-        EnvelopeGen *gen = ref_list_get(ctx->envelopes, i);
-        gen->start -= offset;
-        gen->last -= offset;
-    }
 
     for(int i = 0; i < ctx->buffer->length; i ++) {
         PlayingNote *note = ref_list_get(ctx->buffer, i);
         note->time -= offset;
+        note->envelope->start -= offset;
+        note->envelope->last -= offset;
     }
 
     pthread_mutex_lock(&ctx->queue_mutex);
+
     for(int i = 0; i < ctx->queue->length; i ++) {
         PlayingNote *note = ref_list_get(ctx->queue, i);
         note->time -= offset;
     }
+
     pthread_mutex_unlock(&ctx->queue_mutex);
 }
 
+void audio_context_release_same_track_note(AudioContext *ctx, PlayingNote *note) {
+    int tn = note->track;
+    int in = note->instrument;
+
+    for (int i = 0; i < ctx->buffer->length; i ++) {
+        PlayingNote *ex = ref_list_get(ctx->buffer, i);
+        if (ex->track == tn && ex->instrument == in) {
+            playing_note_free(ex);
+            ref_list_del(ctx->buffer, i);
+            break;
+        }
+    }
+}
+
 bool audio_context_fill_buffer(AudioContext *ctx) {
+    ctx->buffer_update_count += 1;
+    audio_context_request_buffer_update(ctx, -1);
     pthread_mutex_lock(&ctx->queue_mutex);
     if (ctx->queue->length > 0) {
         PlayingNote *last = ref_list_get(ctx->queue, ctx->queue->length - 1);
         if (last->time > ctx->time) {
-            int dst = round((last->time - ctx->time) * SAMPLE_RATE);
-            ctx->update_buffer_at = ctx->sample_pos + dst - 1;
+            int dst = ceil((last->time - ctx->time) * SAMPLE_RATE + 2);
+            audio_context_request_buffer_update(ctx, ctx->sample_pos + dst);
             pthread_mutex_unlock(&ctx->queue_mutex);
             return false;
         }
     }
 
+
     bool updated = false;
+
     while(ctx->queue->length > 0) {
         PlayingNote *note = ref_list_pop(ctx->queue);
-        EnvelopeGen *gen = audio_context_get_envelope(ctx, note->track,
-                                                      note->instrument);
         if (note->time <= ctx->time) {
             if (note->state == NOTE_STATE_TRIGGER) {
-                audio_context_release_note_buffer(ctx, note->track, note->instrument, false);
+                audio_context_release_same_track_note(ctx, note);
+
+                EnvelopeGen *envelope = malloc(sizeof(EnvelopeGen));
+                if (envelope == NULL) {
+                    pthread_mutex_unlock(&ctx->queue_mutex);
+                    return false;
+                }
+
+                Instrument *instrument = ref_list_get(ctx->state->instruments, note->instrument);
+               *envelope = envelope_gen_for_instrument(instrument);
+
+                note->envelope = envelope;
                 note->state = NOTE_STATE_PLAY;
                 ref_list_add(ctx->buffer, note);
-                envelope_gen_reset(gen);
-                envelope_gen_trigger(gen, note->time);
+
+                envelope_gen_trigger(envelope, note->time);
+
                 updated = true;
             } else if (note->state == NOTE_STATE_RELEASE) {
-                envelope_gen_release(gen, note->time);
+                for (int i = 0; i < ctx->buffer->length; i ++) {
+                    PlayingNote *ex = ref_list_get(ctx->buffer, i);
+                    if (ex->track == note->track && ex->instrument == note->instrument) {
+                        envelope_gen_release(ex->envelope, note->time);
+                    }
+                }
                 updated = true;
             }
         } else {
             ref_list_add(ctx->queue, note);
-            int dst = round((note->time - ctx->time) * SAMPLE_RATE);
-            ctx->update_buffer_at = ctx->sample_pos + dst - 1;
+            int dst = ceil((note->time - ctx->time) * SAMPLE_RATE + 2);
+            audio_context_request_buffer_update(ctx, ctx->sample_pos + dst);
             break;
         }
     }
@@ -527,7 +556,7 @@ bool audio_context_fill_buffer(AudioContext *ctx) {
     return updated;
 }
 
-float calc_op(Operator op, float prev, float value) {
+inline static float calc_op(Operator op, float prev, float value) {
     if (op == OPERATOR_EQ) {
         return value;
     } else if (op == OPERATOR_ADD) {
@@ -547,7 +576,7 @@ WaveFrame audio_context_calculate_wave_frame(AudioContext *ctx,
                                              WaveFrame *previous) {
     Song *song = ctx->state->song;
     Instrument *instrument = ref_list_get(ctx->state->instruments,
-                                          note->instrument - 1);
+                                          note->instrument);
     Wave *wave = &instrument->wave;
     int step_n = previous != NULL ? previous->step_n : 0;
     if (step_n >= wave->length) {
@@ -566,7 +595,7 @@ WaveFrame audio_context_calculate_wave_frame(AudioContext *ctx,
     float ring_mod = calc_op(step->ring_mod_operator,
                                 prev_ring_mod,
                                 step->ring_mod);
-    ring_mod = CLAMP(ring_mod, 1, 256);
+    ring_mod = CLAMP(ring_mod, MIN_RING_MOD, MAX_RING_MOD) - 1;
 
     float prev_ring_mod_amount = previous != NULL
                              ? previous->ring_mod_amount
@@ -574,7 +603,7 @@ WaveFrame audio_context_calculate_wave_frame(AudioContext *ctx,
     float ring_mod_amount = calc_op(step->ring_mod_amount_operator,
                                 prev_ring_mod_amount,
                                 step->ring_mod_amount);
-    ring_mod_amount = CLAMP(ring_mod_amount, 1, 256);
+    ring_mod_amount = NORM(ring_mod_amount, MIN_RING_MOD_AMOUNT, MAX_RING_MOD_AMOUNT);
 
     float prev_hard_sync = previous != NULL
                              ? previous->hard_sync
@@ -582,21 +611,24 @@ WaveFrame audio_context_calculate_wave_frame(AudioContext *ctx,
     float hard_sync = calc_op(step->hard_sync_operator,
                                 prev_hard_sync,
                                 step->hard_sync);
-    hard_sync = CLAMP(hard_sync, 1, 256);
+    hard_sync = CLAMP(hard_sync, MIN_HARD_SYNC, MAX_HARD_SYNC) - 1;
 
     float prev_pulse_width = previous != NULL
                              ? previous->pulse_width
-                             : INITIAL_PW;
+                             : INITIAL_PULSE_WIDTH;
     float pulse_width = calc_op(step->pulse_width_operator,
                                 prev_pulse_width,
                                 step->pulse_width);
-    pulse_width = CLAMP(pulse_width, 1, 256);
+    pulse_width = NORM(pulse_width, MIN_PULSE_WIDTH, MAX_PULSE_WIDTH);
 
     float note_duration = ctx->time - note->time;
-    int duration = SAMPLE_RATE * 240.0 / ((wave->step - 1) * (song->bpm - 1));
-    int psn = floor(note_duration * (wave->step - 1) *
-                   (song->bpm - 1) / 240.0);
-    int pos = duration * psn;
+    int note_sample_duration = SAMPLE_RATE * note_duration;
+    float duration = (float)SAMPLE_RATE * 240.0 / ((wave->step - 1) * (song->bpm - 1));
+    int frames_past = floor(note_sample_duration / duration);
+
+//    int part_frame_passed = floor(note_duration * (wave->step - 1) *
+                              //    (song->bpm - 1) / 240.0);
+    int pos = ctx->sample_pos - note_sample_duration + frames_past * duration;
 
     return (WaveFrame){
         .sample_pos = pos,
@@ -614,7 +646,7 @@ FilterFrame audio_context_calculate_filter_frame(AudioContext *ctx,
                                                  FilterFrame *previous) {
     Song *song = ctx->state->song;
     Instrument *instrument = ref_list_get(ctx->state->instruments,
-                                          note->instrument - 1);
+                                          note->instrument);
     Filter *filter = &instrument->filter;
     int step_n = previous != NULL ? previous->step_n : 0;
     if (step_n >= filter->length) {
@@ -633,7 +665,7 @@ FilterFrame audio_context_calculate_filter_frame(AudioContext *ctx,
     float resonance = calc_op(step->resonance_operator,
                                 prev_resonance,
                                 step->resonance);
-    resonance = CLAMP(resonance, 1, 256);
+    resonance = NORM(resonance, MIN_RESONANCE, MAX_RESONANCE);
 
     float prev_cutoff = previous != NULL
                              ? previous->cutoff
@@ -641,14 +673,14 @@ FilterFrame audio_context_calculate_filter_frame(AudioContext *ctx,
     float cutoff = calc_op(step->cutoff_operator,
                                 prev_cutoff,
                                 step->cutoff);
-    cutoff = CLAMP(cutoff, 1, 256);
+    cutoff = NORM(cutoff, MIN_CUTOFF, MAX_CUTOFF);
 
     float note_duration = ctx->time - note->time;
-    int duration = SAMPLE_RATE * 240.0 / ((filter->step - 1) *
+    int note_sample_duration = SAMPLE_RATE * note_duration;
+    float duration = (float)SAMPLE_RATE * 240.0 / ((filter->step - 1) *
                    (song->bpm - 1));
-    int psn = floor(note_duration * (filter->step - 1) *
-                    (song->bpm - 1) / 240.0);
-    int pos = duration * psn;
+    int frames_past = floor(note_sample_duration / duration);
+    int pos = ctx->sample_pos - note_sample_duration + frames_past * duration;
 
     return (FilterFrame){
         .sample_pos = pos,
@@ -664,7 +696,7 @@ ArpeggioFrame audio_context_calculate_arpeggio_frame(AudioContext *ctx,
                                                      ArpeggioFrame *previous) {
     Song *song = ctx->state->song;
     Arpeggio *arpeggio = ref_list_get(ctx->state->arpeggios,
-                                      note->arpeggio - 1);
+                                      note->arpeggio);
     int step_n = previous != NULL ? previous->step_n : 0;
     if (step_n >= arpeggio->length) {
         if (arpeggio->repeat) {
@@ -682,14 +714,14 @@ ArpeggioFrame audio_context_calculate_arpeggio_frame(AudioContext *ctx,
     float pitch = calc_op(step->pitch_operator,
                                 prev_pitch,
                                 step->pitch);
-    pitch = CLAMP(pitch, 1, 109);
+    pitch = CLAMP(pitch, MIN_PITCH, MAX_PITCH) - 1;
 
     float note_duration = ctx->time - note->time;
-    int duration = SAMPLE_RATE * 240.0 / ((arpeggio->step - 1) *
+    int note_sample_duration = SAMPLE_RATE * note_duration;
+    float duration = (float)SAMPLE_RATE * 240.0 / ((arpeggio->step - 1) *
                                           (song->bpm - 1));
-    int psn = floor(note_duration * (arpeggio->step - 1) *
-                    (song->bpm - 1) / 240.0);
-    int pos = duration * psn;
+    int frames_past = floor(note_sample_duration / duration);
+    int pos = ctx->sample_pos - note_sample_duration + frames_past * duration;
 
     return (ArpeggioFrame){
         .sample_pos = pos,
@@ -698,8 +730,9 @@ ArpeggioFrame audio_context_calculate_arpeggio_frame(AudioContext *ctx,
         .note = pitch};
 }
 
-Frame audio_context_calculate_frame(AudioContext *ctx, PlayingNote *note,
-                                    Frame *previous) {
+Frame *audio_context_calculate_frame(AudioContext *ctx, PlayingNote *note) {
+    Frame *previous = note->frame;
+
     WaveFrame wave;
     if (previous != NULL) {
         WaveFrame *prev = &previous->wave;
@@ -724,17 +757,19 @@ Frame audio_context_calculate_frame(AudioContext *ctx, PlayingNote *note,
         filter = audio_context_calculate_filter_frame(ctx, note, NULL);
     }
 
-    Frame frame = (Frame){
-        .track = note->track,
-        .instrument = note->instrument,
-        .prev = previous,
+    Frame *frame = malloc(sizeof(Frame));
+    if (frame == NULL) {
+        return NULL;
+    }
+
+    *frame = (Frame){
         .wave = wave,
         .filter = filter,
         .play_arpeggio = note->arpeggio != EMPTY
     };
 
-    if (!frame.play_arpeggio) {
-        frame.note = note->note;
+    if (!frame->play_arpeggio) {
+        frame->note = note->note;
         return frame;
     }
 
@@ -750,107 +785,88 @@ Frame audio_context_calculate_frame(AudioContext *ctx, PlayingNote *note,
         arpeggio = audio_context_calculate_arpeggio_frame(ctx, note, NULL);
     }
 
-    frame.arpeggio = arpeggio;
+    frame->arpeggio = arpeggio;
     return frame;
 }
 
-float get_min_frame_end(Frame *frame) {
+inline static float get_min_frame_end(Frame *frame) {
     WaveFrame *wave = &frame->wave;
     FilterFrame *filter = &frame->filter;
     ArpeggioFrame *arp = &frame->arpeggio;
     int wave_end = wave->sample_pos + wave->duration;
     int filter_end = filter->sample_pos + filter->duration;
-    int arp_end = arp->sample_pos + filter->duration;
-    return MIN(wave_end, MIN(filter_end, arp_end));
+    if (frame->play_arpeggio) {
+        int arp_end = arp->sample_pos + arp->duration;
+        return MIN(wave_end, MIN(filter_end, arp_end));
+    } else {
+        return MIN(wave_end, filter_end);
+    }
 }
 
 bool audio_context_fill_frames(AudioContext *ctx) {
-    int update_at = ctx->update_buffer_at;
+            //    printf("check %d\n", ctx->sample_pos);
+    ctx->frames_update_count += 1;
+    audio_context_request_frames_update(ctx, -1);
     bool updated = false;
     for (int i = 0; i < ctx->buffer->length; i ++) {
         PlayingNote *note = ref_list_get(ctx->buffer, i);
-        int prev_frame_ndx = -1;
-        Frame *prev = NULL;
-        for (int j = 0; j < ctx->frames->length; j ++) {
-            Frame *frame = ref_list_get(ctx->frames, j);
-            if (frame->track == note->track &&
-                frame->instrument == note->instrument) {
-                prev = frame;
-                prev_frame_ndx = j;
-                break;
-            }
-        }
-
+        Frame *prev = note->frame;
         if (prev != NULL) {
             int end = get_min_frame_end(prev);
             if (end > ctx->sample_pos) {
+                int end = get_min_frame_end(prev);
+            //    printf("requet %d\n", end + 2);
+                audio_context_request_frames_update(ctx, end + 2);
                 continue; // no need for update
             }
         }
 
         updated = true;
 
-        Frame *frame = malloc(sizeof(Frame));
+        Frame *frame = audio_context_calculate_frame(ctx, note);
         if (frame == NULL) {
             return false;
         }
 
-        *frame = audio_context_calculate_frame(ctx, note, prev);
-        update_at = MIN(update_at, get_min_frame_end(frame));
+        int end = get_min_frame_end(frame);
+//                printf("requet 2 %d %d\n", end + 2, frame->filter.duration);
+        audio_context_request_frames_update(ctx, end + 2);
 
         if (prev != NULL) {
             free(prev);
-            ref_list_set(ctx->frames, prev_frame_ndx, frame);
-        } else {
-            ref_list_add(ctx->frames, frame);
         }
+        note->frame = frame;
     }
 
-    ctx->update_frames_at = update_at;
     return updated;
 }
 
 bool audio_context_update_play_buffers(AudioContext *ctx) {
-    bool update_buffer = ctx->sample_pos >= ctx->update_buffer_at;
-    if (update_buffer && !audio_context_fill_buffer(ctx)) {
-        return false;
+    bool update_buffer = audio_context_need_buffer_update(ctx);
+    bool buffer_updated = false;
+    if (update_buffer) {
+        buffer_updated = audio_context_fill_buffer(ctx);
     }
 
+    bool update_frames = audio_context_need_frames_update(ctx);
+
     // fill frames if buffer update or if frames requested update
-    if ((update_buffer || ctx->sample_pos >= ctx->update_frames_at) &&
-        !audio_context_fill_frames(ctx)) {
-        return false;
+    if (buffer_updated || update_frames) {
+        if (!audio_context_fill_frames(ctx)) {
+            return false;
+        }
     }
 
     return true;
 }
 
 
-void audio_context_release_note_buffer(AudioContext *ctx, int tn, int in, bool del_envelope) {
-    if (del_envelope) {
-        for (int i = 0; i < ctx->envelopes->length; i ++) {
-            EnvelopeGen *gen = ref_list_get(ctx->envelopes, i);
-            if (gen->track == tn && gen->instrument == in) {
-                free(gen);
-                ref_list_del(ctx->envelopes, i);
-                break;
-            }
-        }
-    }
 
-    for (int i = 0; i < ctx->frames->length; i ++) {
-        Frame *frame = ref_list_get(ctx->frames, i);
-        if (frame->track == tn && frame->instrument == in) {
-            free(frame);
-            ref_list_del(ctx->frames, i);
-            break;
-        }
-    }
-
+void audio_context_release_note(AudioContext *ctx, PlayingNote *note) {
     for (int i = 0; i < ctx->buffer->length; i ++) {
-        PlayingNote *note = ref_list_get(ctx->buffer, i);
-        if (note->track == tn && note->instrument == in) {
-            free(note);
+        PlayingNote *ex = ref_list_get(ctx->buffer, i);
+        if (ex == note) {
+            playing_note_free(ex);
             ref_list_del(ctx->buffer, i);
             break;
         }
@@ -951,27 +967,25 @@ typedef struct {
 } Output;
 
 inline static float note_freq(float note) {
-    float ref_note = 59; // A4 440
+    float ref_note = 58; // A4 440
     float ref_freq = 440;
     float dn = note - ref_note;
     return ref_freq * pow(tett, dn);
 }
 
-inline static Output single_voice(AudioContext *ctx, Frame *frame, int nv,
+inline static Output single_voice(AudioContext *ctx, PlayingNote *note, int nv,
                                   float detune, float separation, float offset) {
-    int tn = frame->track;
-    int in = frame->instrument;
-
-    Instrument *instrument = ref_list_get(ctx->state->instruments, in - 1);
-    EnvelopeGen *envelope = audio_context_get_envelope(ctx, tn, in);
+    Instrument *instrument = note->instrument_ref;;
+    EnvelopeGen *envelope = note->envelope;
+    Frame *frame = note->frame;
 
     // parameters
-    float note = frame->play_arpeggio ? frame->arpeggio.note : frame->note;
-    float freq = note_freq(note);
-    float vol = (float)instrument->volume / 256;
+    float pitch = frame->play_arpeggio ? frame->arpeggio.note : frame->note;
+    float freq = note_freq(pitch);
+    float vol = NORM((float)instrument->volume, MIN_PARAM, MAX_PARAM);
     float nvl = nv * 2;
     float nvr = nv * 2 + 1;
-    float pan = ((float)instrument->pan - 128) / 256;
+    float pan = NORM((float)instrument->pan, MIN_PARAM, MAX_PARAM);
 
     // phases
     float cycle_len_l = (float)SAMPLE_RATE / (freq - detune);
@@ -982,10 +996,10 @@ inline static Output single_voice(AudioContext *ctx, Frame *frame, int nv,
     float xr = tr - floor(tr);
 
     // wave
-    float yl = wave(ctx, frame->track, nvl, frame->wave.form,
-                    (frame->wave.pulse_width - 1) / 255, xl);
-    float yr = wave(ctx, frame->track, nvr, frame->wave.form,
-                    (frame->wave.pulse_width - 1) / 255, xr);
+    float yl = wave(ctx, note->track, nvl, frame->wave.form,
+                    frame->wave.pulse_width, xl);
+    float yr = wave(ctx, note->track, nvr, frame->wave.form,
+                    frame->wave.pulse_width, xr);
 
     // envelope
     float e = envelope_gen_calculate(envelope, ctx->time);
@@ -993,31 +1007,29 @@ inline static Output single_voice(AudioContext *ctx, Frame *frame, int nv,
     yl *= vol * e;
     yr *= vol * e;
 
-    yl *= (-pan + 1.0) / 2;
-    yr *= (pan + 1.0) / 2;
+    float pd = abs(pan - 0.5);
+    yl *= (1 - pan) * (-pd + 1) * 2;
+    yr *= pan * (-pd + 1) * 2;
 
     // output
 
     // TODO hard sync
     // TODO ring mod
     // TODO filter
-
+    //
     return (Output){ .left = yl, .right = yr };
 }
 
-inline static Output instrument_voice(AudioContext *ctx, Frame *frame) {
+inline static Output instrument_voice(AudioContext *ctx, PlayingNote *note) {
 
-    Output first = single_voice(ctx, frame, 0, 0,
+    Output first = single_voice(ctx, note, 0, 0,
                                 WIDENING_OFFSET / 2, -0.224);
-    Output second = single_voice(ctx, frame, 1, WIDENING_DETUNE,
+    Output second = single_voice(ctx, note, 1, WIDENING_DETUNE,
                                  WIDENING_OFFSET, 0.0);
 
-    int tn = frame->track;
-    int in = frame->instrument;
-    EnvelopeGen *envelope = audio_context_get_envelope(ctx, tn, in);
-
+    EnvelopeGen *envelope = note->envelope;
     if (envelope->state == ENVELOPE_IDLE) {
-        audio_context_release_note_buffer(ctx, tn, in, true);
+        audio_context_release_note(ctx, note);
     }
 
     // TODO FX
@@ -1030,6 +1042,7 @@ inline static Output instrument_voice(AudioContext *ctx, Frame *frame) {
 void typed_audio_callback(AudioContext *ctx, short* stream, int len) {
 
     float dt = 1.0 / SAMPLE_RATE;
+//;    int start = SDL_GetTicks();
     for (int i = 0; i < len / 2; i ++) {
         ctx->time += dt;
         ctx->sample_pos += 1;
@@ -1037,16 +1050,23 @@ void typed_audio_callback(AudioContext *ctx, short* stream, int len) {
         audio_context_update_play_buffers(ctx);
 
         Output mix = (Output){ .left = 0, .right = 0 };
-        for (int j = 0; j < ctx->frames->length; j ++) {
-           Frame *frame = ref_list_get(ctx->frames, j);
-           Output output = instrument_voice(ctx, frame);
-           mix.left += output.left / ctx->frames->length;
-           mix.right += output.right / ctx->frames->length;
+        float fmix = MAX(1.0, (float)ctx->buffer->length / 1.0);
+        for (int j = 0; j < ctx->buffer->length; j ++) {
+            PlayingNote *note = ref_list_get(ctx->buffer, j);
+            Output output = instrument_voice(ctx, note);
+            mix.left += output.left / fmix;
+            mix.right += output.right / fmix;
         }
 
         stream[i * 2] = mix.left;
         stream[i * 2 + 1] = mix.right;
     }
+    /*
+    int elapsed = SDL_GetTicks() - start;
+    float total = ((float)len / (float)SAMPLE_RATE);
+    float load = (float)elapsed / 1000.0 / total;
+    printf("%d %d %f of %f\n", len, elapsed, load, total); 
+    */
 
     if (ctx->time > 6) {
         audio_context_offset_time(ctx, 6);

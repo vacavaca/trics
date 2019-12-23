@@ -10,7 +10,7 @@ CFLAGS = -g -Wall -Wextra -Wpedantic \
           -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
           -Wredundant-decls -Wnested-externs -Wmissing-include-dirs
 else
-CFLAGS = -Wall -Wextra -Wpedantic \
+CFLAGS = -pg -Wall -Wextra -Wpedantic \
           -Wformat=2 -Wno-unused-parameter -Wshadow \
           -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
           -Wredundant-decls -Wnested-externs -Wmissing-include-dirs
@@ -32,7 +32,7 @@ $(BUILD_DIR):
 	mkdir $(BUILD_DIR)
 
 $(TARGET): $(BUILD_DIR) $(OBJECTS)
-	$(CC) $(OBJECTS) -Wall $(LIBS) -o $@
+	$(CC) -no-pie -pg $(OBJECTS) -Wall $(LIBS) -o $@
 
 clean:
 	rm -rf $(BUILD_DIR)
