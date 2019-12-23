@@ -161,7 +161,7 @@ void envelope_gen_reset(EnvelopeGen *gen) {
 
 PlayingNote *playing_note_init(State *state, int instrument, int track,
                                int arpeggio, int note, bool song_note,
-                               float time, bool trigger) {
+                               float time, bool trigger, int ndx) {
     PlayingNote *playing_note = malloc(sizeof(PlayingNote));
     if (playing_note == NULL) {
         return NULL;
@@ -179,7 +179,8 @@ PlayingNote *playing_note_init(State *state, int instrument, int track,
         .state = trigger ? NOTE_STATE_TRIGGER : NOTE_STATE_RELEASE,
         .envelope = NULL,
         .frame = NULL,
-        .instrument_ref = instrument_ref};
+        .instrument_ref = instrument_ref,
+        .ndx = ndx};
 
     return playing_note;
 }
@@ -251,7 +252,8 @@ AudioContext *audio_context_init(State *state) {
         .update_request_mutex = PTHREAD_MUTEX_INITIALIZER,
         .queue_mutex = PTHREAD_MUTEX_INITIALIZER,
         .frames_update_count = 0,
-        .buffer_update_count = 0};
+        .buffer_update_count = 0,
+        .note_ndx = 0};
 
     for (int i = 0; i < MAX_TRACKS * MAX_PATTERN_VOICES + 1; i ++) {
         for (int j = 0; j < WIDENING_OSCILLATORS; j++) {
@@ -343,15 +345,12 @@ bool audio_context_trigger_step(AudioContext *ctx, int instrument,
         return false;
     }
 
-//    int track = MAX_TRACKS * MAX_PATTERN_VOICES; // last solo track
-
-    track += 1;
-    track %= 16;
+    int track = MAX_TRACKS * MAX_PATTERN_VOICES; // last solo track
 
     arpeggio = arpeggio == EMPTY ? EMPTY : arpeggio - 1;
 
     PlayingNote *trigger = playing_note_init(ctx->state, instrument - 1, track, arpeggio, note - 1,
-                                             false, ctx->time, true);
+                                             false, ctx->time, true, ++ctx->note_ndx);
     if (trigger == NULL) {
         return false;
     }
@@ -359,7 +358,7 @@ bool audio_context_trigger_step(AudioContext *ctx, int instrument,
     float whole = 4.0 * 60.0 / ((float)(ctx->state->song->bpm - 1));
     float end = ctx->time + whole * step / step_div;
     PlayingNote *release = playing_note_init(ctx->state, instrument - 1, track, arpeggio, note - 1,
-                                             false, end, false);
+                                             false, end, false, ++ctx->note_ndx);
     if (release == NULL) {
         goto cleanup_trigger;
     }
@@ -995,11 +994,15 @@ inline static Output single_voice(AudioContext *ctx, PlayingNote *note, int nv,
     float xl = tl - floor(tl);
     float xr = tr - floor(tr);
 
+    // TODO hard sync
+
     // wave
     float yl = wave(ctx, note->track, nvl, frame->wave.form,
                     frame->wave.pulse_width, xl);
     float yr = wave(ctx, note->track, nvr, frame->wave.form,
                     frame->wave.pulse_width, xr);
+
+    // TODO ring mod
 
     // envelope
     float e = envelope_gen_calculate(envelope, ctx->time);
@@ -1013,19 +1016,17 @@ inline static Output single_voice(AudioContext *ctx, PlayingNote *note, int nv,
 
     // output
 
-    // TODO hard sync
-    // TODO ring mod
     // TODO filter
-    //
+
     return (Output){ .left = yl, .right = yr };
 }
 
 inline static Output instrument_voice(AudioContext *ctx, PlayingNote *note) {
 
     Output first = single_voice(ctx, note, 0, 0,
-                                WIDENING_OFFSET / 2, -0.224);
+                                WIDENING_OFFSET / 2, -0.224 + (float)(note->ndx % 23) / 23);
     Output second = single_voice(ctx, note, 1, WIDENING_DETUNE,
-                                 WIDENING_OFFSET, 0.0);
+                                 WIDENING_OFFSET, 0.0 + (float)(note->ndx % 23) / 23);
 
     EnvelopeGen *envelope = note->envelope;
     if (envelope->state == ENVELOPE_IDLE) {

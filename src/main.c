@@ -67,11 +67,11 @@ int main(int argc, char *argv[]) {
     int i = 0;
     int fu = 0;
     int bu = 0;
-    float delay = 60.0 / 128. / 0.5;
+    float delay = 60.0 / 128. / 2;
     while (true) {
         i += 1;
 
-        if(!audio_context_trigger_step(ctx, 1, EMPTY, 59 -12 * 2  , 1, 64)) {
+        if(!audio_context_trigger_step(ctx, 1, EMPTY, 59 -12 * 3  , 1, 64)) {
             printf("FAILED NOTE \n");
         }
         int dbu = ctx->buffer_update_count - bu;

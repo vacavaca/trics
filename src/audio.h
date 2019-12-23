@@ -95,6 +95,7 @@ typedef struct {
     int track;
     int arpeggio;
     int note;
+    int ndx;
     bool song_note;
     float time;
     NoteState state;
@@ -133,6 +134,7 @@ typedef struct {
     pthread_mutex_t queue_mutex;
     volatile int frames_update_count;
     volatile int buffer_update_count;
+    int note_ndx;
 } AudioContext;
 
 AudioContext *audio_context_init(State *state);

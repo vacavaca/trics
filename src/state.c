@@ -20,9 +20,9 @@ Instrument *instrument_init(char const *name) {
         .octave = 4,
         .hard_restart = false,
         .attack = 1,
-        .decay = 1,
+        .decay = 12,
         .sustain = 256,
-        .release = 14,
+        .release = 17,
         .wave = (Wave){.repeat = true, .step = 32},
         .filter = (Filter){.repeat = true, .step = 32}};
 
@@ -37,7 +37,7 @@ Instrument *instrument_init(char const *name) {
     memcpy(instrument->name, name, len + 1);
 
     WaveStep wave_step = (WaveStep){
-        .form = WAVE_FORM_SAW,
+        .form = WAVE_FORM_SQUARE,
         .ring_mod_operator = OPERATOR_EQ,
         .ring_mod = 13,
         .ring_mod_amount_operator = OPERATOR_EQ,
@@ -50,6 +50,7 @@ Instrument *instrument_init(char const *name) {
     instrument_set_wave_step(instrument, 0, wave_step);
 
     /*
+     // TODO
     wave_step = (WaveStep){
         .form = WAVE_FORM_SQUARE,
         .ring_mod_operator = OPERATOR_EQ,
