@@ -123,6 +123,13 @@ void *ref_list_del(RefList *list, int n) {
         return NULL;
     }
 
+    if (n == 0 && list->length == 1) {
+        void *item = list->array[n];
+        list->array[0] = NULL;
+        list->length = 0;
+        return item;
+    }
+
     void *item = list->array[n];
     memcpy(list->array + n, list->array + n + 1,
            (list->length - n - 1) * list->item_size);

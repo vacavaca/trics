@@ -4,6 +4,7 @@
 #include "state.h" // State
 #include "reflist.h" // RefList
 #include "util.h" // MAX, MIN
+#include "filter.h" // LadderFilter
 #include <SDL2/SDL.h>
 #include <math.h> // floor
 #include <string.h> // memcpy
@@ -20,9 +21,10 @@
 #define ENVELOPE_MIN_RELEASE 0.006
 #define ENVELOPE_MAX_RELEASE 24
 #define MAX_VALUE 32767
-#define WIDENING_DETUNE 0.25
-#define WIDENING_OFFSET 0.1
+#define WIDENING_DETUNE 0.24
+#define WIDENING_OFFSET -0.4
 #define WIDENING_OSCILLATORS 4
+#define TETT 1.0594630943592953  // 2 ^ (1 / 12)
 
 typedef enum {
     ENVELOPE_IDLE = 0,
@@ -67,7 +69,6 @@ typedef struct {
     int duration;
 
     int step_n;
-    FilterType type;
     float resonance;
     float cutoff;
 } FilterFrame;
@@ -102,6 +103,10 @@ typedef struct {
     EnvelopeGen *envelope;
     Frame *frame;
     Instrument *instrument_ref;
+    Arpeggio *arpeggio_ref;
+    float random;
+    int sample_pos;
+    LadderFilter *filters[WIDENING_OSCILLATORS];
 } PlayingNote;
 
 // queue  - queue with future note trigger and release events

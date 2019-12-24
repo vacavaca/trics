@@ -7,7 +7,9 @@
 #define MAX(a, b) (a >= b ? a : b)
 #define MIN(a, b) (a <= b ? a : b)
 #define CLAMP(a, n, x) MIN(MAX(a, n), x)
-#define NORM(a, n, x) ((CLAMP(a, n, x) - n) / (x - n))
+#define NORM(a, n, x) ((CLAMP((float)a, n, x) - n) / (x - n))
+
+#define PI 3.14159265359
 
 int sign(int a);
 

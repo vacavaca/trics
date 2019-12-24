@@ -41,7 +41,7 @@
 #define MIN_RING_MOD_AMOUNT 1
 #define MAX_RING_MOD_AMOUNT 256
 #define INITIAL_HARD_SYNC 2
-#define MIN_HARD_SYNC 2
+#define MIN_HARD_SYNC 1
 #define MAX_HARD_SYNC MAX_NOTE
 #define INITIAL_RESONANCE 1
 #define MIN_RESONANCE 1
@@ -56,7 +56,8 @@
 
 #define INT_PARAM(n) (n + 1)
 
-_Static_assert(sizeof(int) == 4, "Never gonna give you up");
+// Never gonna give you up
+_Static_assert(sizeof(int) == 4, "Never gonna let you down");
 
 typedef enum {
     OPERATOR_EQ = '=',
@@ -94,14 +95,7 @@ typedef struct {
     volatile int length;
 } Wave;
 
-typedef enum {
-    FILTER_TYPE_LP,
-    FILTER_TYPE_BP,
-    FILTER_TYPE_HP,
-} FilterType;
-
 typedef struct {
-    FilterType type;
     volatile Operator resonance_operator;
     volatile int resonance;
     volatile Operator cutoff_operator;

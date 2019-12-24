@@ -67,11 +67,11 @@ int main(int argc, char *argv[]) {
     int i = 0;
     int fu = 0;
     int bu = 0;
-    float delay = 60.0 / 128. / 2;
+    float delay = 60.0 / 128. / 1;
     while (true) {
         i += 1;
 
-        if(!audio_context_trigger_step(ctx, 1, EMPTY, 59 -12 * 3  , 1, 64)) {
+        if(!audio_context_trigger_step(ctx, 1, 1, 59 -12 * 3  , 1, 15)) {
             printf("FAILED NOTE \n");
         }
         int dbu = ctx->buffer_update_count - bu;
@@ -91,6 +91,8 @@ int main(int argc, char *argv[]) {
     printf("b %d  f %d\n", ctx->buffer_update_count, ctx->frames_update_count);
 
     return 0;
+    /*
+    */
 
     Interface *interface = interface_init(state);
 

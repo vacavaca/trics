@@ -2,7 +2,7 @@
 #define REFLIST_H
 
 #include <stdlib.h>  // malloc
-#include <stdbool.h> // bol
+#include <stdbool.h> // bool
 #include <string.h> // memcpy
 
 #define DEFAULT_LIST_CAPACITY 64

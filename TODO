@@ -1,4 +1,3 @@
-* in frame all values normalized and preapared for sound gen
 * operator control 1h
 * optimize refresh 4h
   * only on input or bar
@@ -11,13 +10,7 @@
 * min/max for controls, ckeck state constraints
 * first op is always =
 * recording ?
-* envelopes ?
-* wave table (shapes) ?
-* ring mod ?
-* hard sync ?
-* pw mod ?
 * filter ?
-* arpeggios ?
 * delay ?
 * reverb ?
 * linter

@@ -20,11 +20,11 @@ Instrument *instrument_init(char const *name) {
         .octave = 4,
         .hard_restart = false,
         .attack = 1,
-        .decay = 12,
-        .sustain = 256,
-        .release = 17,
-        .wave = (Wave){.repeat = true, .step = 32},
-        .filter = (Filter){.repeat = true, .step = 32}};
+        .decay = 53,
+        .sustain = 1,
+        .release = 1,
+        .wave = (Wave){.repeat = false, .step = 64 + 1},
+        .filter = (Filter){.repeat = false, .step = 128 + 1}};
 
     int len = strlen(name);
 
@@ -36,8 +36,10 @@ Instrument *instrument_init(char const *name) {
 
     memcpy(instrument->name, name, len + 1);
 
+   char form = WAVE_FORM_SAW;
+
     WaveStep wave_step = (WaveStep){
-        .form = WAVE_FORM_SQUARE,
+        .form = form,
         .ring_mod_operator = OPERATOR_EQ,
         .ring_mod = 13,
         .ring_mod_amount_operator = OPERATOR_EQ,
@@ -49,12 +51,23 @@ Instrument *instrument_init(char const *name) {
 
     instrument_set_wave_step(instrument, 0, wave_step);
 
-    /*
-     // TODO
     wave_step = (WaveStep){
-        .form = WAVE_FORM_SQUARE,
+        .form = form,
         .ring_mod_operator = OPERATOR_EQ,
-        .ring_mod = 13,
+        .ring_mod = 1,
+        .ring_mod_amount_operator = OPERATOR_EQ,
+        .ring_mod_amount = 1,
+        .hard_sync_operator = OPERATOR_QSUB,
+        .hard_sync = 3,
+        .pulse_width_operator = OPERATOR_EQ,
+        .pulse_width = 128};
+
+   //instrument_set_wave_step(instrument, 1, wave_step);
+
+    wave_step = (WaveStep){
+        .form = form,
+        .ring_mod_operator = OPERATOR_EQ,
+        .ring_mod = 9,
         .ring_mod_amount_operator = OPERATOR_EQ,
         .ring_mod_amount = 1,
         .hard_sync_operator = OPERATOR_EQ,
@@ -62,17 +75,23 @@ Instrument *instrument_init(char const *name) {
         .pulse_width_operator = OPERATOR_EQ,
         .pulse_width = 128};
 
-    instrument_set_wave_step(instrument, 1, wave_step);
-    */
+//    instrument_set_wave_step(instrument, 2, wave_step);
 
     FilterStep filter_step = (FilterStep){
-        .type = FILTER_TYPE_LP,
         .resonance_operator = OPERATOR_EQ,
-        .resonance = 1,
+        .resonance = 95,
         .cutoff_operator = OPERATOR_EQ,
-        .cutoff = 256};
+        .cutoff = 66};
 
     instrument_set_filter_step(instrument, 0, filter_step);
+
+    filter_step = (FilterStep){
+        .resonance_operator = OPERATOR_QADD,
+        .resonance = 4,
+        .cutoff_operator = OPERATOR_SUB,
+        .cutoff = 2};
+
+    instrument_set_filter_step(instrument, 1, filter_step);
 
     return instrument;
 }
@@ -99,7 +118,7 @@ Arpeggio *arpeggio_init(char const *name) {
         return NULL;
     }
 
-    *arpeggio = (Arpeggio){.repeat = true, .step = 32};
+    *arpeggio = (Arpeggio){.repeat = false, .step = 16 + 1};
 
     int len = strlen(name);
     arpeggio->name = malloc(len + 1);
@@ -115,6 +134,22 @@ Arpeggio *arpeggio_init(char const *name) {
         .pitch = 0};
 
     arpeggio_set_step(arpeggio, 0, step);
+
+    step = (ArpeggioStep){
+        .pitch_operator = OPERATOR_SUB,
+        .pitch = 2};
+
+//    arpeggio_set_step(arpeggio, 1, step);
+
+    step = (ArpeggioStep){
+        .pitch_operator = OPERATOR_ADD,
+        .pitch = 6};
+
+
+    step = (ArpeggioStep){
+        .pitch_operator = OPERATOR_ADD,
+        .pitch = 13};
+
 
     return arpeggio;
 }
