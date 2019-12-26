@@ -371,7 +371,7 @@ bool audio_context_trigger_step(AudioContext *ctx, int instrument,
                                 int arpeggio, int note, int step,
                                 int step_div) {
     if (!ctx->playing) {
-        return false;
+        //return false;
     }
 
     track += 1;
@@ -654,7 +654,6 @@ WaveFrame audio_context_calculate_wave_frame(AudioContext *ctx,
                                 prev_pulse_width,
                                 NORM(step->pulse_width, MIN_PULSE_WIDTH, MAX_PULSE_WIDTH));
 
-    float note_duration = ctx->time - note->time;
     float duration = (float)SAMPLE_RATE * 240.0 / ((wave->step - 1) * (song->bpm - 1));
 
     return (WaveFrame){
@@ -707,7 +706,6 @@ FilterFrame audio_context_calculate_filter_frame(AudioContext *ctx,
                                 NORM(step->cutoff, MIN_CUTOFF, MAX_CUTOFF));
     cutoff = NORM(cutoff, 0, 1);
 
-    float note_duration = ctx->time - note->time;
     float duration = (float)SAMPLE_RATE * 240.0 / ((filter->step - 1) *
                    (song->bpm - 1));
 
@@ -748,7 +746,6 @@ ArpeggioFrame audio_context_calculate_arpeggio_frame(AudioContext *ctx,
                                 step->pitch);
     pitch = CLAMP(pitch, 0, MAX_PITCH - 1);
 
-    float note_duration = ctx->time - note->time;
     float duration = (float)SAMPLE_RATE * 240.0 / ((arpeggio->step - 1) *
                                           (song->bpm - 1));
 
@@ -949,7 +946,7 @@ inline static float and_wave(float a, float b) {
     return (float)((short)round(a) & (short)round(b));
 }
 
-inline static wave(AudioContext *ctx, WaveFrame *wave, int ndx, int osc, float x) {
+inline static float wave(AudioContext *ctx, WaveFrame *wave, int ndx, int osc, float x) {
     float result = 0.0;
     if ((wave->form & WAVE_FORM_NOIZE) == WAVE_FORM_NOIZE) {
         if (result == 0.0) {
@@ -1017,6 +1014,7 @@ inline static Output single_voice(AudioContext *ctx, PlayingNote *note, int nv,
     EnvelopeGen *envelope = note->envelope;
     Frame *frame = note->frame;
 
+
     // parameters
     float pitch = frame->play_arpeggio ? frame->arpeggio.note : frame->note;
     float freq_offset = (note->random - 0.5) * 2 * 0.125;
@@ -1025,6 +1023,8 @@ inline static Output single_voice(AudioContext *ctx, PlayingNote *note, int nv,
     if (frame->wave.hard_sync > 0) {
         sync_note(note, pitch, freq_offset, offset, ctx->sample_pos);
     }
+
+    // TODO a lot of constant variables and expressions, preinitialize
 
     float freq = note_freq(pitch + frame->wave.hard_sync) + freq_offset;
     float vol = NORM((float)instrument->volume, MIN_PARAM, MAX_PARAM);
@@ -1044,6 +1044,7 @@ inline static Output single_voice(AudioContext *ctx, PlayingNote *note, int nv,
     float yl = wave(ctx, &frame->wave, note->track, nvl, xl);
     float yr = wave(ctx, &frame->wave, note->track, nvr, xr);
 
+
     // envelope
     float e = envelope_gen_calculate(envelope, ctx->time);
 
@@ -1058,15 +1059,17 @@ inline static Output single_voice(AudioContext *ctx, PlayingNote *note, int nv,
 
     // filter
 
-    filter_set_resonance(note->filters[nvl], frame->filter.resonance);
-    filter_set_cutoff(note->filters[nvl], frame->filter.cutoff * 20000);
+    if (frame->filter.cutoff < 0.995) {
+        filter_set_cutoff(note->filters[nvl], frame->filter.cutoff * 20000);
+        filter_set_resonance(note->filters[nvl], frame->filter.resonance);
 
-    filter_set_resonance(note->filters[nvr], frame->filter.resonance);
-    filter_set_cutoff(note->filters[nvr], frame->filter.cutoff * 20000);
+        filter_set_cutoff(note->filters[nvr], frame->filter.cutoff * 20000);
+        filter_set_resonance(note->filters[nvr], frame->filter.resonance);
 
-    yl = filter_process(note->filters[nvl], yl / MAX_VALUE) * MAX_VALUE;
-    yr = filter_process(note->filters[nvr], yr / MAX_VALUE) * MAX_VALUE;
 
+        yl = filter_process(note->filters[nvl], yl / MAX_VALUE) * MAX_VALUE;
+        yr = filter_process(note->filters[nvr], yr / MAX_VALUE) * MAX_VALUE;
+    }
 
     return (Output){ .left = yl, .right = yr };
 }
@@ -1143,14 +1146,16 @@ inline static Output ring_mod_voice(AudioContext *ctx, PlayingNote *note, int nv
 
     // filter
 
-    filter_set_resonance(note->filters[nvl], frame->filter.resonance);
-    filter_set_cutoff(note->filters[nvl], frame->filter.cutoff * 20000);
+    if (frame->filter.cutoff < 0.995) { 
+        filter_set_cutoff(note->filters[nvl], frame->filter.cutoff * 20000);
+        filter_set_resonance(note->filters[nvl], frame->filter.resonance);
 
-    filter_set_resonance(note->filters[nvr], frame->filter.resonance);
-    filter_set_cutoff(note->filters[nvr], frame->filter.cutoff * 20000);
+        filter_set_cutoff(note->filters[nvr], frame->filter.cutoff * 20000);
+        filter_set_resonance(note->filters[nvr], frame->filter.resonance);
 
-    yl = filter_process(note->filters[nvl], yl / MAX_VALUE) * MAX_VALUE;
-    yr = filter_process(note->filters[nvr], yr / MAX_VALUE) * MAX_VALUE;
+        yl = filter_process(note->filters[nvl], yl / MAX_VALUE) * MAX_VALUE;
+        yr = filter_process(note->filters[nvr], yr / MAX_VALUE) * MAX_VALUE;
+    }
 
     return (Output){ .left = yl, .right = yr };
 }
@@ -1176,7 +1181,7 @@ inline static Output instrument_voice(AudioContext *ctx, PlayingNote *note) {
 
     EnvelopeGen *envelope = note->envelope;
     if (envelope->state == ENVELOPE_IDLE) {
-        audio_context_release_note(ctx, note);
+        //audio_context_release_note(ctx, note);
     }
 
     // TODO FX
@@ -1207,7 +1212,6 @@ inline static float comp(float x, float threshold, float ratio) {
 void typed_audio_callback(AudioContext *ctx, short* stream, int len) {
 
     float dt = 1.0 / SAMPLE_RATE;
-//    int start = SDL_GetTicks();
 
     for (int i = 0; i < len / 2; i ++) {
         ctx->time += dt;
@@ -1230,12 +1234,6 @@ void typed_audio_callback(AudioContext *ctx, short* stream, int len) {
         stream[i * 2] = floor(mix_left);
         stream[i * 2 + 1] = floor(mix_right);
     }
-    /*
-    int elapsed = SDL_GetTicks() - start;
-    float total = ((float)len / (float)SAMPLE_RATE);
-    float load = (float)elapsed / 1000.0 / total;
-    printf("%d %d %f of %f\n", len, elapsed, load, total);
-    */
 
     if (ctx->time > 6) {
         audio_context_offset_time(ctx, 6);

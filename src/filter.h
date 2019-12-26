@@ -12,8 +12,9 @@ typedef struct {
     float k;
     float t1;
     float t2;
-    float resonance;
+    float r;
     float cutoff;
+    float resonance;
     int sample_rate;
 } LadderFilter;
 

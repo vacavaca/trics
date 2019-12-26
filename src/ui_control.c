@@ -185,14 +185,17 @@ void control_bool_free(ControlBool *control) {
 
 // ControlInt
 
-ControlInt control_int_init(volatile int *const value, bool allow_empty) {
+ControlInt control_int_init(volatile int *const value, bool allow_empty,
+                            int min, int max) {
     return (ControlInt){
         .value = value,
         .edit_value = *value,
         .edit_text = NULL,
         .allow_empty = allow_empty,
         .edit = false,
-        .reseted = false};
+        .reseted = false,
+        .min = min,
+        .max = max};
 }
 
 char *int_repr(int value) {
@@ -233,17 +236,23 @@ bool control_int_edit(ControlInt *control) {
     return true;
 }
 
-int clamp_int(int value, bool allow_empty) {
+int clamp_int(ControlInt *control, int value) {
     if (value < 0) {
         value = EMPTY;
     }
 
-    if (!allow_empty && value == EMPTY) {
+    if (!control->allow_empty && value == EMPTY) {
         value += 1;
     }
 
-    if (value > 256) {
-        value = 256;
+    int d = control->allow_empty ? 0 : 1;
+    if (value > control->max + d) {
+        value = control->max + d;
+    }
+
+    if (value < control->min + d &&
+        (!control->allow_empty || value != EMPTY)) {
+        value = control->min + d;
     }
 
     return value;
@@ -254,7 +263,7 @@ bool control_int_handle_step_input(ControlInt *control, int i) {
         return false;
     }
 
-    int value = clamp_int(control->edit_value + i, control->allow_empty);
+    int value = clamp_int(control, control->edit_value + i);
 
     if (value != control->edit_value) {
         char *prev = control->edit_text;
@@ -278,7 +287,7 @@ bool control_int_handle_multiplier_input(ControlInt *control, double i) {
     }
 
     int value = (int)round((double)control->edit_value * i);
-    value = clamp_int(value, control->allow_empty);
+    value = clamp_int(control, value);
     if (value != control->edit_value) {
         char *prev = control->edit_text;
         control->edit_text = int_repr(value);
@@ -336,7 +345,7 @@ InputResult control_int_handle_input(ControlInt *control, char key) {
             return (InputResult) { .handled = false };
         }
 
-        value = clamp_int(value + 1, control->allow_empty);
+        value = clamp_int(control, value + 1);
         control->edit_value = value;
         control->reseted = true;
         return (InputResult) { .handled = true };
@@ -349,7 +358,7 @@ InputResult control_int_handle_input(ControlInt *control, char key) {
             return (InputResult) { .handled = false };
         }
 
-        value = clamp_int(value + 1, control->allow_empty);
+        value = clamp_int(control, value + 1);
         control->edit_value = value;
         return (InputResult) { .handled = true, .done = true };
     }
@@ -363,7 +372,7 @@ bool control_int_empty(ControlInt *control) {
     if (control->edit) {
         char *prev = control->edit_text;
         control->edit_text = int_repr(EMPTY);
-        if (control->edit_text != NULL) {
+        if (control->edit_text == NULL) {
             control->edit_text = prev;
             return false;
         }
@@ -385,6 +394,15 @@ bool control_int_save_edit(ControlInt* control) {
 
     free(control->edit_text);
     control->edit_text = NULL;
+
+    if (control->edit_value < control->min - 1 ||
+        control->edit_value > control->max + 1 &&
+        (!control->allow_empty || control->edit_value != EMPTY)) {
+        control->edit_value = *control->value;
+        control->edit = false;
+        return false;
+    }
+
     bool eq = *control->value == control->edit_value;
     *control->value = control->edit_value;
     control->edit = false;
@@ -842,10 +860,114 @@ void control_note_free(ControlNote *control){
     }
 }
 
+// ControlOperator
+
+ControlOperator control_operator_init(volatile Operator *const value) {
+    return (ControlOperator){
+        .value = value,
+        .edit_value = *value,
+        .edit_text = '\0',
+        .edit = false};
+}
+
+char control_operator_repr(ControlOperator *control) {
+    if (control->edit) {
+        return control->edit_text;
+    } else {
+        return *control->value;
+    }
+}
+
+bool control_operator_edit(ControlOperator *control) {
+    if (control->edit) {
+        return false;
+    }
+
+    control->edit_value = *control->value;
+    control->edit_text = *control->value;
+    control->edit = true;
+
+    return true;
+}
+
+bool chartoop(Operator *op, char c) {
+    if (c == '=') {
+        *op = OPERATOR_EQ;
+        return true;
+    } else if (c == '+') {
+        *op = OPERATOR_ADD;
+        return true;
+    } else if (c == '<') {
+        *op = OPERATOR_QADD;
+        return true;
+    } else if (c == '-') {
+        *op = OPERATOR_SUB;
+        return true;
+    } else if (c == '>') {
+        *op = OPERATOR_QSUB;
+        return true;
+    }
+
+    return false;
+}
+
+bool control_operator_handle_step_input(ControlOperator *control, int i) {
+    if (!control->edit || i == 0) {
+        return false;
+    }
+
+    Operator *op = 0;
+    bool allowed = chartoop(op, (char)control->edit_value + i);
+    if (!allowed) {
+        return false;
+    }
+
+    control->edit_text = *op;
+    control->edit_value = *op;
+    return true;
+}
+
+InputResult control_operator_handle_input(ControlOperator *control, char key) {
+    if (!control->edit) {
+        return (InputResult) { .handled = false };
+    }
+
+    Operator *op = 0;
+    bool allowed = chartoop(op, key);
+    if (!allowed) {
+        return (InputResult) { .handled = false };
+    }
+
+    control->edit_text = *op;
+    control->edit_value = *op;
+    return (InputResult) { .handled = true, .done = true };
+}
+
+bool control_operator_save_edit(ControlOperator *control) {
+    if (!control->edit) {
+        return false;
+    }
+
+    *control->value = control->edit_value;
+    control->edit = false;
+
+    return true;
+}
+
+
+bool control_operator_discard_edit(ControlOperator *control) {
+    if (!control->edit) {
+        return false;
+    }
+
+    control->edit = false;
+    return true;
+}
+
 // Control
 
 Control control_init_bool(volatile bool *value, bool allow_empty,
-                          void (*on_change)(void *), void *layout) {
+                          void (*on_change)(void *), void *interface) {
     return (Control){
         .type = CONTROL_TYPE_BOOL,
         .control_bool = control_bool_init(value),
@@ -854,24 +976,30 @@ Control control_init_bool(volatile bool *value, bool allow_empty,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
-        .layout = layout};
+        .interface = interface};
 }
 
 Control control_init_int(volatile int *value, bool allow_empty,
-                         void (*on_change)(void *), void *layout) {
+                         void (*on_change)(void *), void *interface,
+                         int min, int max) {
     return (Control){
         .type = CONTROL_TYPE_INT,
-        .control_int = control_int_init(value, allow_empty),
+        .control_int = control_int_init(value, allow_empty, min, max),
         .rect = (Rect){ .x=0, .y=0, .width=2, .height=1 },
         .focus = false,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
-        .layout = layout};
+        .interface = interface};
+}
+
+Control control_init_free_int(volatile int *value, bool allow_empty,
+                              void (*on_change)(void *), void *interface) {
+    return control_init_int(value, allow_empty, on_change, interface, MIN_PARAM, MAX_PARAM);
 }
 
 Control control_init_text(char **value, int width, bool allow_empty,
-                          void (*on_change)(void *), void *layout) {
+                          void (*on_change)(void *), void *interface) {
     return (Control){
         .type = CONTROL_TYPE_TEXT,
         .control_text = control_text_init(value, allow_empty, width),
@@ -880,12 +1008,12 @@ Control control_init_text(char **value, int width, bool allow_empty,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
-        .layout = layout};
+        .interface = interface};
 }
 
 Control control_init_note(volatile int *value, int *base_octave,
                           bool allow_empty, void (*on_change)(void *),
-                          void *layout) {
+                          void *interface) {
     return (Control){
         .type = CONTROL_TYPE_NOTE,
         .control_note = control_note_init(value, base_octave, allow_empty),
@@ -894,7 +1022,20 @@ Control control_init_note(volatile int *value, int *base_octave,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
-        .layout = layout};
+        .interface = interface};
+}
+
+Control control_init_operator(volatile Operator *value,
+                              void (*on_change)(void *), void *interface) {
+    return (Control){
+        .type = CONTROL_TYPE_OPERATOR,
+        .control_operator = control_operator_init(value),
+        .rect = (Rect){ .x=0, .y=0, .width=1, .height=1 },
+        .focus = false,
+        .edit = false,
+        .focused_at = -1,
+        .on_change = on_change,
+        .interface = interface};
 }
 
 char *control_repr(Control *control) {
@@ -906,6 +1047,15 @@ char *control_repr(Control *control) {
         return control_text_repr(&control->control_text);
     } else if (control->type == CONTROL_TYPE_NOTE) {
         return control_note_repr(&control->control_note);
+    } else if (control->type == CONTROL_TYPE_OPERATOR) {
+        char *str = malloc(1);
+        if (str == NULL) {
+            return NULL;
+        }
+
+        char r = control_operator_repr(&control->control_operator);
+        str[0] = r;
+        return str;
     }
 
     char *str = malloc(3);
@@ -974,6 +1124,8 @@ void control_discard_edit(Control *control) {
         control_text_discard_edit(&control->control_text);
     } else if (control->type == CONTROL_TYPE_NOTE) {
         control_note_discard_edit(&control->control_note);
+    } else if (control->type == CONTROL_TYPE_OPERATOR) {
+        control_operator_discard_edit(&control->control_operator);
     }
 
     control->edit = false;
@@ -1001,6 +1153,8 @@ bool control_edit(Control *control) {
         result = control_text_edit(&control->control_text);
     } else if (control->type == CONTROL_TYPE_NOTE) {
         result = control_note_edit(&control->control_note);
+    } else if (control->type == CONTROL_TYPE_OPERATOR) {
+        result = control_operator_edit(&control->control_operator);
     }
 
     if (result) {
@@ -1018,6 +1172,8 @@ bool control_handle_step_input(Control *control, int i) {
         return control_int_handle_step_input(&control->control_int, i);
     } else if (control->type == CONTROL_TYPE_NOTE) {
         return control_note_handle_step_input(&control->control_note, i);
+    } else if (control->type == CONTROL_TYPE_OPERATOR) {
+        return control_operator_handle_step_input(&control->control_operator, i);
     }
 
     return false;
@@ -1040,21 +1196,15 @@ InputResult control_handle_input(Control *control, char key) {
         return control_text_handle_input(&control->control_text, key);
     } else if (control->type == CONTROL_TYPE_NOTE) {
         return control_note_handle_input(&control->control_note, key);
+    } else if (control->type == CONTROL_TYPE_OPERATOR) {
+        return control_operator_handle_input(&control->control_operator, key);
     }
 
     return (InputResult){ .handled = false };
 }
 
 bool control_handle_wheel_input(Control *control, Point const *point, int i) {
-    if (control->type == CONTROL_TYPE_BOOL) {
-        return control_bool_handle_step_input(&control->control_bool, i);
-    } else if (control->type == CONTROL_TYPE_INT) {
-        return control_int_handle_step_input(&control->control_int, i);
-    } else if (control->type == CONTROL_TYPE_NOTE) {
-        return control_note_handle_step_input(&control->control_note, i);
-    }
-
-    return false;
+    return control_handle_step_input(control, i);
 }
 
 bool control_empty(Control* control) {
@@ -1081,6 +1231,8 @@ void control_save_edit(Control *control) {
         updated = control_text_save_edit(&control->control_text);
     } else if (control->type == CONTROL_TYPE_NOTE) {
         updated = control_note_save_edit(&control->control_note);
+    } else if (control->type == CONTROL_TYPE_OPERATOR) {
+        updated = control_operator_save_edit(&control->control_operator);
     }
 
     control->edit = false;

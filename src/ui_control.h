@@ -18,6 +18,7 @@ typedef enum {
     CONTROL_TYPE_INT,
     CONTROL_TYPE_TEXT,
     CONTROL_TYPE_NOTE,
+    CONTROL_TYPE_OPERATOR,
 } ControlType;
 
 typedef struct {
@@ -35,6 +36,8 @@ typedef struct {
     bool allow_empty;
     bool edit;
     bool reseted;
+    int min;
+    int max;
 } ControlInt;
 
 typedef struct {
@@ -56,6 +59,13 @@ typedef struct {
     bool edit;
 } ControlNote;
 
+typedef struct {
+    volatile Operator *value;
+    Operator edit_value;
+    char edit_text;
+    bool edit;
+} ControlOperator;
+
 typedef struct
 {
     ControlType type;
@@ -64,27 +74,35 @@ typedef struct
         ControlInt control_int;
         ControlText control_text;
         ControlNote control_note;
+        ControlOperator control_operator;
     };
     Rect rect;
     bool focus;
     bool edit;
     int focused_at;
     void (*on_change)(void *); // self
-    void *layout;
+    void *interface;
 } Control;
 
 Control control_init_bool(volatile bool *value, bool allow_empty,
-                          void (*on_change)(void *), void *layout);
+                          void (*on_change)(void *), void *interface);
 
 Control control_init_int(volatile int *value, bool allow_empty,
-                         void (*on_change)(void *), void *layout);
+                         void (*on_change)(void *), void *interface,
+                         int min, int max);
+
+Control control_init_free_int(volatile int *value, bool allow_empty,
+                              void (*on_change)(void *), void *interface);
 
 Control control_init_text(char **value, int width, bool allow_empty,
-                          void (*on_change)(void *), void *layout);
+                          void (*on_change)(void *), void *interface);
 
 Control control_init_note(volatile int *value, int *base_octave,
                           bool allow_empty, void (*on_change)(void *),
-                          void *layout);
+                          void *interface);
+
+Control control_init_operator(volatile Operator *value,
+                              void (*on_change)(void *), void *interface);
 
 char *control_repr(Control *control);
 

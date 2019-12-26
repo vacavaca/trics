@@ -15,7 +15,204 @@ bool interface_set_layout(Interface *interface, int tab, Layout *layout) {
     return ref_list_set(interface->layouts, tab, layout);
 }
 
-ControlTable *init_song_params_table(Layout *layout, Song *const song) {
+Layout *interface_get_layout(Interface *interface, int tab) {
+    return ref_list_get(interface->layouts, tab);
+}
+
+void pattern_table_auto_set_insrument(Layout *layout, ControlTable *table,
+                                     int x, int y) {
+    State *state = layout->state;
+    int in = state->vars[STATE_VAR_INSTRUMENT] - 1;
+    for (int i = 0; i < state->song->step - 1; i++) {
+        Control *row = ref_list_get(table->rows, i);
+        for (int j = 0; j < MAX_PATTERN_VOICES; j++) {
+            Control *control = &row[j * 3];
+            if (control->rect.y == y && control->rect.x == x - 3 &&
+                *control->control_int.value == EMPTY) {
+                *control->control_int.value = in + 1;
+            }
+        }
+    }
+}
+
+void handle_control_note_insert(void *self) {
+    Control *control = self;
+    Layout *layout = interface_get_layout(control->interface, TAB_PATTERN);
+    ControlTable *pattern_table = ref_list_get(layout->tables, 1);
+    pattern_table_auto_set_insrument(layout, pattern_table,
+                                     control->rect.x, control->rect.y);
+}
+
+bool pattern_table_update_pattern(Interface *interface, Layout *layout,
+                                  ControlTable *table) {
+    State *state = layout->state;
+    int n = state->vars[STATE_VAR_PATTERN] - 1;
+    while (n >= state->patterns->length) {
+        if (state_create_pattern(state) == -1) {
+            return false;
+        }
+    }
+
+    Pattern *pattern = ref_list_get(state->patterns, n);
+    if (pattern == NULL) {
+        return false;
+    }
+
+    int in = state->vars[STATE_VAR_INSTRUMENT] - 1;
+    Instrument *instrument = ref_list_get(state->instruments, in);
+    if (instrument == NULL) {
+        return false;
+    }
+
+    int *octave = (int *)&instrument->octave;
+
+    for (int i = 0; i < state->song->step - 1; i++) {
+        Control row[3 * MAX_PATTERN_VOICES];
+        for (int j = 0; j < MAX_PATTERN_VOICES; j++) {
+            volatile Step *step = &pattern->steps[i][j];
+            row[0 + j * 3] = control_init_int(&step->instrument, true,
+                                              NULL, interface, 0, MAX_INSTRUMENTS);
+
+            row[1 + j * 3] = control_init_note(&step->note, octave,
+                                               true, handle_control_note_insert, interface);
+
+            row[2 + j * 3] = control_init_int(&step->arpeggio, true,
+                                              NULL, interface, 0, MAX_ARPEGGIOS);
+        }
+
+        if (!control_table_set(table, i, row)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void handle_control_select_pattern(void *self) {
+    Control *control = self;
+    Layout *layout = interface_get_layout(control->interface, TAB_PATTERN);
+    ControlTable *pattern_table = ref_list_get(layout->tables, 1);
+    pattern_table_update_pattern(control->interface, layout, pattern_table);
+}
+
+void pattern_table_transpose(Layout *layout, ControlTable *table) {
+    State *state = layout->state;
+    for (int i = 0; i < state->song->step - 1; i++) {
+        Control *row = ref_list_get(table->rows, i);
+        for (int j = 0; j < MAX_PATTERN_VOICES; j++) {
+            Control *control = &row[j * 3 + 1];
+            int note = *control->control_note.value;
+            int d = 12 * (state->vars[STATE_VAR_TRANSPOSE + j] - 5);
+            if (d != 0 && note != EMPTY && note != NONE) {
+                note += d;
+                if (note <= EMPTY) {
+                    note = EMPTY;
+                }
+
+                if (note > 109) {
+                    note = 109;
+                }
+
+                *control->control_note.value = note;
+            }
+        }
+    }
+
+    for (int i = 0; i < MAX_PATTERN_VOICES; i++) {
+        state->vars[STATE_VAR_TRANSPOSE + i] = 5;
+    }
+}
+
+void handle_control_transpose(void *self) {
+    Control *control = self;
+    Layout *layout = interface_get_layout(control->interface, TAB_PATTERN);
+    ControlTable *pattern_table = ref_list_get(layout->tables, 1);
+    pattern_table_transpose(layout, pattern_table);
+}
+
+ControlTable *init_pattern_params_table(Interface *interface, Layout *layout) {
+    char const *headers[3] = {"##", "t1", "t2"};
+    State *state = layout->state;
+    ControlTable *table = control_table_init(3, 2, 3, 8, 2, headers, 0);
+    if (table == NULL) {
+        return NULL;
+    }
+
+    Control controls[3] = {
+        control_init_int(&state->vars[STATE_VAR_PATTERN], false,
+                         handle_control_select_pattern, interface, 0, MAX_PATTERNS),
+        control_init_free_int(&state->vars[STATE_VAR_TRANSPOSE], false,
+                         handle_control_transpose, interface),
+        control_init_free_int(&state->vars[STATE_VAR_TRANSPOSE + 1], false,
+                         handle_control_transpose, interface),
+    };
+
+    if (!control_table_add(table, controls)) {
+        control_table_free(table);
+        return NULL;
+    }
+
+    return table;
+}
+
+ControlTable *init_pattern_table(Interface *interface, Layout *layout) {
+    char const *headers[6] = {"in", "nt", "ar", "in", "nt", "ar"};
+    ControlTable *table = control_table_init(6, 2, 6, 23, 9, headers, 4);
+    if (table == NULL) {
+        return NULL;
+    }
+
+    if (!pattern_table_update_pattern(interface, layout, table)) {
+        control_table_free(table);
+        return NULL;
+    }
+
+    return table;
+}
+
+Layout *init_pattern_layout(Interface *interface, State *const state) {
+    Layout *layout = layout_init(state);
+    if (layout == NULL) {
+        return NULL;
+    }
+
+    ControlTable *params_table = init_pattern_params_table(interface, layout);
+    if (params_table == NULL) {
+        goto cleanup_layout;
+    }
+
+    if (!layout_add_table(layout, params_table)) {
+        goto cleanup_params_table;
+    }
+
+    ControlTable *pattern_table = init_pattern_table(interface, layout);
+    if (pattern_table == NULL) {
+        goto cleanup_params_table;
+    }
+
+    if (!layout_add_table(layout, pattern_table)) {
+        goto cleanup_pattern_table;
+    }
+
+    return layout;
+
+cleanup_pattern_table:
+    control_table_free(pattern_table);
+cleanup_params_table:
+    control_table_free(params_table);
+cleanup_layout:
+    layout_free(layout);
+    return NULL;
+}
+
+void handle_control_pattern_step(void *self) {
+    Control *control = self;
+    Layout *layout = interface_get_layout(control->interface, TAB_PATTERN);
+    ControlTable *pattern_table = ref_list_get(layout->tables, 1);
+    pattern_table_transpose(layout, pattern_table);
+}
+
+ControlTable *init_song_params_table(Interface *interface, Song *const song) {
     char const *song_params_headers[3] = {"bp", "st", "title"};
     ControlTable *song_params_table = control_table_init(3, 2, 3, 23, 2,
                                                          song_params_headers, 0);
@@ -24,9 +221,9 @@ ControlTable *init_song_params_table(Layout *layout, Song *const song) {
     }
 
     Control song_param_controls[3] = {
-        control_init_int(&song->bpm, false, NULL, layout),
-        control_init_int(&song->step, false, NULL, layout),
-        control_init_text(&song->name, 17, true, NULL, layout),
+        control_init_free_int(&song->bpm, false, NULL, interface),
+        control_init_int(&song->step, false, handle_control_pattern_step, interface, MIN_PATTERN_STEP, MAX_PATTERN_STEP),
+        control_init_text(&song->name, 17, true, NULL, interface),
     };
 
     if (!control_table_add(song_params_table, song_param_controls)) {
@@ -37,7 +234,7 @@ ControlTable *init_song_params_table(Layout *layout, Song *const song) {
     return song_params_table;
 }
 
-ControlTable *init_song_arrangement_table(Layout *layout, Song *const song) {
+ControlTable *init_song_arrangement_table(Interface *interface, Song *const song) {
     ControlTable *arrangement_table = control_table_init(8, 2, 6, 23, 9, NULL, 0);
     if (arrangement_table == NULL) {
         return NULL;
@@ -45,14 +242,14 @@ ControlTable *init_song_arrangement_table(Layout *layout, Song *const song) {
 
     for (int i = 0; i < MAX_SONG_LENGTH; i++) {
         Control arrangement_row[8] = {
-            control_init_int(&song->patterns[i][0], true, NULL, layout),
-            control_init_int(&song->patterns[i][1], true, NULL, layout),
-            control_init_int(&song->patterns[i][2], true, NULL, layout),
-            control_init_int(&song->patterns[i][3], true, NULL, layout),
-            control_init_int(&song->patterns[i][4], true, NULL, layout),
-            control_init_int(&song->patterns[i][5], true, NULL, layout),
-            control_init_int(&song->patterns[i][6], true, NULL, layout),
-            control_init_int(&song->patterns[i][7], true, NULL, layout),
+            control_init_int(&song->patterns[i][0], true, NULL, interface, MIN_PARAM, MAX_PATTERNS),
+            control_init_int(&song->patterns[i][1], true, NULL, interface, MIN_PARAM, MAX_PATTERNS),
+            control_init_int(&song->patterns[i][2], true, NULL, interface, MIN_PARAM, MAX_PATTERNS),
+            control_init_int(&song->patterns[i][3], true, NULL, interface, MIN_PARAM, MAX_PATTERNS),
+            control_init_int(&song->patterns[i][4], true, NULL, interface, MIN_PARAM, MAX_PATTERNS),
+            control_init_int(&song->patterns[i][5], true, NULL, interface, MIN_PARAM, MAX_PATTERNS),
+            control_init_int(&song->patterns[i][6], true, NULL, interface, MIN_PARAM, MAX_PATTERNS),
+            control_init_int(&song->patterns[i][7], true, NULL, interface, MIN_PARAM, MAX_PATTERNS),
         };
 
         if (!control_table_add(arrangement_table, arrangement_row)) {
@@ -99,191 +296,6 @@ cleanup_layout:
     return NULL;
 }
 
-void pattern_table_auto_set_insrument(Layout *layout, ControlTable *table,
-                                     int x, int y) {
-    State *state = layout->state;
-    int in = state->vars[STATE_VAR_INSTRUMENT] - 1;
-    for (int i = 0; i < state->song->step - 1; i++) {
-        Control *row = ref_list_get(table->rows, i);
-        for (int j = 0; j < MAX_PATTERN_VOICES; j++) {
-            Control *control = &row[j * 3];
-            if (control->rect.y == y && control->rect.x == x - 3 &&
-                *control->control_int.value == EMPTY) {
-                *control->control_int.value = in + 1;
-            }
-        }
-    }
-}
-
-void handle_control_note_insert(void *self) {
-    Control *control = self;
-    Layout *layout = control->layout;
-    ControlTable *pattern_table = ref_list_get(layout->tables, 1);
-    pattern_table_auto_set_insrument(layout, pattern_table,
-                                     control->rect.x, control->rect.y);
-}
-
-bool pattern_table_update_pattern(Layout *layout, ControlTable *table) {
-    State *state = layout->state;
-    int n = state->vars[STATE_VAR_PATTERN] - 1;
-    while (n >= state->patterns->length) {
-        if (state_create_pattern(state) == -1) {
-            return false;
-        }
-    }
-
-    Pattern *pattern = ref_list_get(state->patterns, n);
-    if (pattern == NULL) {
-        return false;
-    }
-
-    int in = state->vars[STATE_VAR_INSTRUMENT] - 1;
-    Instrument *instrument = ref_list_get(state->instruments, in);
-    if (instrument == NULL) {
-        return false;
-    }
-
-    int *octave = (int *)&instrument->octave;
-
-    for (int i = 0; i < state->song->step - 1; i++) {
-        Control row[3 * MAX_PATTERN_VOICES];
-        for (int j = 0; j < MAX_PATTERN_VOICES; j++) {
-            volatile Step *step = &pattern->steps[i][j];
-            row[0 + j * 3] = control_init_int(&step->instrument, true,
-                                              NULL, layout);
-
-            row[1 + j * 3] = control_init_note(&step->note, octave,
-                                               true, handle_control_note_insert, layout);
-
-            row[2 + j * 3] = control_init_int(&step->arpeggio, true,
-                                              NULL, layout);
-        }
-
-        if (!control_table_set(table, i, row)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-void handle_control_select_pattern(void *self) {
-    Control *control = self;
-    Layout *layout = control->layout;
-    ControlTable *pattern_table = ref_list_get(layout->tables, 1);
-    pattern_table_update_pattern(layout, pattern_table);
-}
-
-void pattern_table_transpose(Layout *layout, ControlTable *table) {
-    State *state = layout->state;
-    for (int i = 0; i < state->song->step - 1; i++) {
-        Control *row = ref_list_get(table->rows, i);
-        for (int j = 0; j < MAX_PATTERN_VOICES; j++) {
-            Control *control = &row[j * 3 + 1];
-            int note = *control->control_note.value;
-            int d = 12 * (state->vars[STATE_VAR_TRANSPOSE + j] - 5);
-            if (d != 0 && note != EMPTY && note != NONE) {
-                note += d;
-                if (note <= EMPTY) {
-                    note = EMPTY;
-                }
-
-                if (note > 109) {
-                    note = 109;
-                }
-
-                *control->control_note.value = note;
-            }
-        }
-    }
-
-    for (int i = 0; i < MAX_PATTERN_VOICES; i++) {
-        state->vars[STATE_VAR_TRANSPOSE + i] = 5;
-    }
-}
-
-void handle_control_transpose(void *self) {
-    Control *control = self;
-    Layout *layout = control->layout;
-    ControlTable *pattern_table = ref_list_get(layout->tables, 1);
-    pattern_table_transpose(layout, pattern_table);
-}
-
-ControlTable *init_pattern_params_table(Layout *layout) {
-    char const *headers[3] = {"##", "t1", "t2"};
-    State *state = layout->state;
-    ControlTable *table = control_table_init(3, 2, 3, 8, 2, headers, 0);
-    if (table == NULL) {
-        return NULL;
-    }
-
-    Control controls[3] = {
-        control_init_int(&state->vars[STATE_VAR_PATTERN], false,
-                         handle_control_select_pattern, layout),
-        control_init_int(&state->vars[STATE_VAR_TRANSPOSE], false,
-                         handle_control_transpose, layout),
-        control_init_int(&state->vars[STATE_VAR_TRANSPOSE + 1], false,
-                         handle_control_transpose, layout),
-    };
-
-    if (!control_table_add(table, controls)) {
-        control_table_free(table);
-        return NULL;
-    }
-
-    return table;
-}
-
-ControlTable *init_pattern_table(Layout *layout) {
-    char const *headers[6] = {"in", "nt", "ar", "in", "nt", "ar"};
-    ControlTable *table = control_table_init(6, 2, 6, 23, 9, headers, 4);
-    if (table == NULL) {
-        return NULL;
-    }
-
-    if (!pattern_table_update_pattern(layout, table)) {
-        control_table_free(table);
-        return NULL;
-    }
-
-    return table;
-}
-
-Layout *init_pattern_layout(State *const state) {
-    Layout *layout = layout_init(state);
-    if (layout == NULL) {
-        return NULL;
-    }
-
-    ControlTable *params_table = init_pattern_params_table(layout);
-    if (params_table == NULL) {
-        goto cleanup_layout;
-    }
-
-    if (!layout_add_table(layout, params_table)) {
-        goto cleanup_params_table;
-    }
-
-    ControlTable *pattern_table = init_pattern_table(layout);
-    if (pattern_table == NULL) {
-        goto cleanup_params_table;
-    }
-
-    if (!layout_add_table(layout, pattern_table)) {
-        goto cleanup_pattern_table;
-    }
-
-    return layout;
-
-cleanup_pattern_table:
-    control_table_free(pattern_table);
-cleanup_params_table:
-    control_table_free(params_table);
-cleanup_layout:
-    layout_free(layout);
-    return NULL;
-}
-
 bool init_layouts(Interface *interface, State *const state) {
     Layout *song_layout = init_song_layout(state->song);
     if (song_layout == NULL) {
@@ -294,7 +306,7 @@ bool init_layouts(Interface *interface, State *const state) {
         goto cleanup_song_layout;
     }
 
-    Layout *pattern_layout = init_pattern_layout(state);
+    Layout *pattern_layout = init_pattern_layout(interface, state);
     if (pattern_layout == NULL) {
         goto cleanup_song_layout;
     }
@@ -989,6 +1001,19 @@ bool handle_edit(Interface *interface, Input const *input) {
         (input_eq(input, &test_bsp) || input_eq(input, &test_del))) {
         if (control_empty(interface->focus_control)) {
             control_save_edit(interface->focus_control);
+        }
+    }
+
+    if (interface->focus_control != NULL) {
+        if (!is_editing &&
+            (input_eq(input, &test_bsp) || input_eq(input, &test_del))) {
+            if (control_empty(interface->focus_control)) {
+                control_save_edit(interface->focus_control);
+            }
+        } else if (is_editing && input_eq(input, &test_del)) {
+            if (control_empty(interface->focus_control)) {
+                control_save_edit(interface->focus_control);
+            }
         }
     }
 

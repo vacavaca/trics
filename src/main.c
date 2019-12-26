@@ -64,10 +64,44 @@ int main(int argc, char *argv[]) {
 
     AudioContext *ctx = audio_context_init(state);
     audio_context_play(ctx, 0);
+    /*
+
+    int start = SDL_GetTicks();
+
+    int max = SAMPLE_RATE * 30;
+    int e = 0;
+    int fu = 0;
+    int bu = 0;
+    while (e < max) {
+        int prev = e;
+        e += 1024;
+        if (prev / (SAMPLE_RATE / 2) != e / (SAMPLE_RATE / 2)) {
+            if(audio_context_trigger_step(ctx, 1, 1, 59 -12 * 3  , 1, 1)) {
+        int dbu = ctx->buffer_update_count - bu;
+        int dfu = ctx->frames_update_count - fu;
+        bu = ctx->buffer_update_count;
+        fu = ctx->frames_update_count;
+        printf("buffer: %d, queue: %d time: %f base_rate: %f  bu/s: %f  fu/s: %f\n", ctx->buffer->length, ctx->queue->length, ctx->time, 1 / 0.5, dbu / 0.5, dfu / 0.5);
+            }
+        }
+
+        short * stream = malloc(sizeof(short) * 1024);
+        typed_audio_callback(ctx, stream, 1024);
+        free(stream);
+    }
+
+    int elapsed = SDL_GetTicks() - start;
+    float total = ((float)(max) / 2 / (float)SAMPLE_RATE);
+    float load = (float)elapsed / 1000.0 / total;
+    printf("%d %d %f of %f\n", max, elapsed, load, total);
+
+    return 0;
+
+
     int i = 0;
     int fu = 0;
     int bu = 0;
-    float delay = 60.0 / 128. / 1;
+    float delay = 60.0 / 128. / 2;
     while (true) {
         i += 1;
 
@@ -81,9 +115,11 @@ int main(int argc, char *argv[]) {
         printf("buffer: %d, queue: %d time: %f base_rate: %f  bu/s: %f  fu/s: %f\n", ctx->buffer->length, ctx->queue->length, ctx->time, 1 / delay, dbu / delay, dfu / delay);
         SDL_Delay(1000.0 * delay);
 
-        if (i > 1000) {
+        if (i > 400) {
             break;
         }
+
+        printf("%d of 400\n", i);
 
        
     }
@@ -91,8 +127,9 @@ int main(int argc, char *argv[]) {
     printf("b %d  f %d\n", ctx->buffer_update_count, ctx->frames_update_count);
 
     return 0;
-    /*
+
     */
+
 
     Interface *interface = interface_init(state);
 

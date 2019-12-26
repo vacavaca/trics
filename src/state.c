@@ -79,17 +79,17 @@ Instrument *instrument_init(char const *name) {
 
     FilterStep filter_step = (FilterStep){
         .resonance_operator = OPERATOR_EQ,
-        .resonance = 95,
+        .resonance = 90,
         .cutoff_operator = OPERATOR_EQ,
-        .cutoff = 66};
+        .cutoff = 30};
 
     instrument_set_filter_step(instrument, 0, filter_step);
 
     filter_step = (FilterStep){
         .resonance_operator = OPERATOR_QADD,
         .resonance = 4,
-        .cutoff_operator = OPERATOR_SUB,
-        .cutoff = 2};
+        .cutoff_operator = OPERATOR_QSUB,
+        .cutoff = 3};
 
     instrument_set_filter_step(instrument, 1, filter_step);
 

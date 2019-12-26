@@ -1,16 +1,13 @@
-* operator control 1h
+* MAX/MIN for controls
 * optimize refresh 4h
   * only on input or bar
   * refresh only restricted area
-* instrument sound ?
 * update state.c initializers
 * playing ?
 * other tab layouts 2h
 * copy/paste 3h
 * min/max for controls, ckeck state constraints
-* first op is always =
 * recording ?
-* filter ?
 * delay ?
 * reverb ?
 * linter
