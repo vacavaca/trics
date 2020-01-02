@@ -95,7 +95,11 @@ bool control_table_set(ControlTable *table, int n, Control const *row) {
     if (ref_list_has(table->rows, n)) {
         Control *ex_row = ref_list_get(table->rows, n);
         for (int i = 0; i < table->column_count; i++) {
-            control_free(&ex_row[i]);
+            Control *control = &ex_row[i];
+            if (control->win) {
+                delwin(control->win);
+            }
+            control_free(control);
         }
 
         free(ex_row);
@@ -126,7 +130,70 @@ bool control_table_set(ControlTable *table, int n, Control const *row) {
     return true;
 }
 
+bool control_table_del(ControlTable *table, int n) {
+    if (ref_list_has(table->rows, n)) {
+        Control *ex_row = ref_list_get(table->rows, n);
+        for (int i = 0; i < table->column_count; i++) {
+            Control *control = &ex_row[i];
+            if (control->win) {
+                delwin(control->win);
+            }
+            control_free(control);
+        }
+
+        free(ex_row);
+        ref_list_del(table->rows, n);
+        return true;
+    }
+
+    return false;
+}
+
+void control_table_clear(ControlTable *table) {
+    for (int i = 0; i < table->rows->length; i ++) {
+        Control *ex_row = ref_list_get(table->rows, i);
+        for (int i = 0; i < table->column_count; i++) {
+            Control *control = &ex_row[i];
+            if (control->win) {
+                delwin(control->win);
+            }
+            control_free(control);
+        }
+
+        free(ex_row);
+    }
+
+    ref_list_clear(table->rows);
+}
+
 void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
+    int header_offset = table->headers != NULL ? 1 : 0;
+    for (int i = 0; i < table->rows->length; i++) {
+        Control *row = ref_list_get(table->rows, i);
+        bool highlight = table->highlight_row != 0 &&
+                         i % table->highlight_row == 0;
+        for (int j = 0; j < table->column_count; j++) {
+            Control *control = &row[j];
+            control->rect.y = i - table->offset + table->rect.y +
+                              header_offset;
+            WINDOW *cwin = newwin(control->rect.height, control->rect.width, control->rect.y, control->rect.x);
+            control_draw(cwin, &row[j]);
+        }
+    }
+}
+
+void control_table_update(ControlTable const *table, int draw_time) {
+    for (int i = 0; i < table->rows->length; i++) {
+        Control *row = ref_list_get(table->rows, i);
+        for (int j = 0; j < table->column_count; j++) {
+            Control *control = &row[j];
+            control_update(control, draw_time);
+        }
+    }
+}
+
+void control_table_refresh(ControlTable const *table) {
+    /*
     if (table->headers != NULL) {
         int offset = 0;
         Control *first_row = ref_list_get(table->rows, 0);
@@ -143,29 +210,6 @@ void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
         }
     }
 
-    int header_offset = table->headers != NULL ? 1 : 0;
-    for (int i = 0; i < table->rows->length; i++) {
-        Control *row = ref_list_get(table->rows, i);
-        bool highlight = table->highlight_row != 0 &&
-                         i % table->highlight_row == 0;
-        if (highlight) {
-            attron(A_BOLD);
-        }
-        for (int j = 0; j < table->column_count; j++) {
-            Control *control = &row[j];
-            control->rect.y = i - table->offset + table->rect.y +
-                              header_offset;
-            if (i >= table->offset &&
-                i < table->offset + MAX_TABLE_VISIBLE_ROWS) {
-                control_draw(win, &row[j], draw_time);
-            }
-        }
-
-        if (highlight) {
-            attroff(A_BOLD);
-        }
-    }
-
     bool offset_positive = table->offset > 0;
     bool offset_above_end = (table->offset + MAX_TABLE_VISIBLE_ROWS) <
                             table->rows->length;
@@ -178,6 +222,33 @@ void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
         wmove(win, 15, 2);
         wprintw(win, "...");
     }
+
+    wrefresh(win);
+
+    int header_offset = table->headers != NULL ? 1 : 0;
+    for (int i = 0; i < table->rows->length; i++) {
+        Control *row = ref_list_get(table->rows, i);
+        bool highlight = table->highlight_row != 0 &&
+                         i % table->highlight_row == 0;
+        if (highlight) {
+            attron(A_BOLD);
+        }
+        for (int j = 0; j < table->column_count; j++) {
+            Control *control = &row[j];
+            control->rect.y = i - table->offset + table->rect.y +
+                              header_offset;
+            mvwin(control->win, control->rect.y, control->rect.x);
+            if (i >= table->offset &&
+                i < table->offset + MAX_TABLE_VISIBLE_ROWS) {
+                control_refresh(control);
+            }
+        }
+
+        if (highlight) {
+            attroff(A_BOLD);
+        }
+    }
+    */
 }
 
 void control_table_focus_first(ControlTable *table) {
@@ -393,13 +464,7 @@ void control_table_focus_clear(ControlTable *table) {
 }
 
 void control_table_free(ControlTable *table) {
-    for (int i = 0; i < table->rows->length; i++) {
-        Control *row = ref_list_get(table->rows, i);
-        for (int j = 0; j < table->column_count; j++) {
-            control_free(&row[j]);
-        }
-        free(row);
-    }
+    control_table_clear(table);
     if (table->headers != NULL) {
         for (int i = 0; i < table->column_count; i++) {
             free(table->headers[i]);

@@ -64,6 +64,10 @@ bool pattern_table_update_pattern(Interface *interface, Layout *layout,
         return false;
     }
 
+    control_table_clear(table);
+
+    table->highlight_row = (state->song->step - 1) / 4;
+
     int *octave = (int *)&instrument->octave;
 
     for (int i = 0; i < state->song->step - 1; i++) {
@@ -97,6 +101,7 @@ void handle_control_select_pattern(void *self) {
 
 void pattern_table_transpose(Layout *layout, ControlTable *table) {
     State *state = layout->state;
+
     for (int i = 0; i < state->song->step - 1; i++) {
         Control *row = ref_list_get(table->rows, i);
         for (int j = 0; j < MAX_PATTERN_VOICES; j++) {
@@ -157,7 +162,7 @@ ControlTable *init_pattern_params_table(Interface *interface, Layout *layout) {
 
 ControlTable *init_pattern_table(Interface *interface, Layout *layout) {
     char const *headers[6] = {"in", "nt", "ar", "in", "nt", "ar"};
-    ControlTable *table = control_table_init(6, 2, 6, 23, 9, headers, 4);
+    ControlTable *table = control_table_init(6, 2, 6, 23, 9, headers, 0);
     if (table == NULL) {
         return NULL;
     }
@@ -207,9 +212,10 @@ cleanup_layout:
 
 void handle_control_pattern_step(void *self) {
     Control *control = self;
-    Layout *layout = interface_get_layout(control->interface, TAB_PATTERN);
+    Interface *interface = control->interface;
+    Layout *layout = interface_get_layout(interface, TAB_PATTERN);
     ControlTable *pattern_table = ref_list_get(layout->tables, 1);
-    pattern_table_transpose(layout, pattern_table);
+    pattern_table_update_pattern(interface, layout, pattern_table);
 }
 
 ControlTable *init_song_params_table(Interface *interface, Song *const song) {
@@ -261,13 +267,13 @@ ControlTable *init_song_arrangement_table(Interface *interface, Song *const song
     return arrangement_table;
 }
 
-Layout *init_song_layout(Song *const song) {
+Layout *init_song_layout(Interface *interface, Song *const song) {
     Layout *layout = layout_init(NULL);
     if (layout == NULL) {
         return NULL;
     }
 
-    ControlTable *params_table = init_song_params_table(layout, song);
+    ControlTable *params_table = init_song_params_table(interface, song);
     if (params_table == NULL) {
         goto cleanup_layout;
     }
@@ -276,7 +282,7 @@ Layout *init_song_layout(Song *const song) {
         goto cleanup_song_table;
     }
 
-    ControlTable *arrangement = init_song_arrangement_table(layout, song);
+    ControlTable *arrangement = init_song_arrangement_table(interface, song);
     if (arrangement == NULL) {
         goto cleanup_song_table;
     }
@@ -297,7 +303,7 @@ cleanup_layout:
 }
 
 bool init_layouts(Interface *interface, State *const state) {
-    Layout *song_layout = init_song_layout(state->song);
+    Layout *song_layout = init_song_layout(interface, state->song);
     if (song_layout == NULL) {
         return false;
     }

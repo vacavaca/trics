@@ -976,7 +976,9 @@ Control control_init_bool(volatile bool *value, bool allow_empty,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
-        .interface = interface};
+        .interface = interface,
+        .win = NULL,
+        .draw_time = 0};
 }
 
 Control control_init_int(volatile int *value, bool allow_empty,
@@ -990,7 +992,9 @@ Control control_init_int(volatile int *value, bool allow_empty,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
-        .interface = interface};
+        .interface = interface,
+        .win = NULL,
+        .draw_time = 0};
 }
 
 Control control_init_free_int(volatile int *value, bool allow_empty,
@@ -1008,7 +1012,9 @@ Control control_init_text(char **value, int width, bool allow_empty,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
-        .interface = interface};
+        .interface = interface,
+        .win = NULL,
+        .draw_time = 0};
 }
 
 Control control_init_note(volatile int *value, int *base_octave,
@@ -1022,7 +1028,9 @@ Control control_init_note(volatile int *value, int *base_octave,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
-        .interface = interface};
+        .interface = interface,
+        .win = NULL,
+        .draw_time = 0};
 }
 
 Control control_init_operator(volatile Operator *value,
@@ -1035,7 +1043,9 @@ Control control_init_operator(volatile Operator *value,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
-        .interface = interface};
+        .interface = interface,
+        .win = NULL,
+        .draw_time = 0};
 }
 
 char *control_repr(Control *control) {
@@ -1067,19 +1077,24 @@ char *control_repr(Control *control) {
     return str;
 }
 
-void control_draw(WINDOW *win, Control *control, int draw_time) {
+
+void control_refresh(Control *control) {
+    if (control->win == NULL) {
+        return;
+    }
+
     int color;
     if (control->focus || control->edit) {
         if (control->focused_at == -1) {
-            control->focused_at = draw_time;
+            control->focused_at = control->draw_time;
         }
 
         const int double_refresh_rate = CURSOR_BLINK_RATE_MSEC * 2;
         if (control->edit ||
-            draw_time - control->focused_at < CURSOR_BLINK_RATE_MSEC) {
+            control->draw_time - control->focused_at < CURSOR_BLINK_RATE_MSEC) {
             color = UI_COLOR_INVERSE;
-        } else if (draw_time - control->focused_at > double_refresh_rate) {
-            control->focused_at = draw_time;
+        } else if (control->draw_time - control->focused_at > double_refresh_rate) {
+            control->focused_at = control->draw_time;
             color = UI_COLOR_INVERSE;
         } else {
             color = UI_COLOR_BRIGHT;
@@ -1093,10 +1108,9 @@ void control_draw(WINDOW *win, Control *control, int draw_time) {
     }
     attron(COLOR_PAIR(color));
 
-    wmove(win, control->rect.y, control->rect.x);
     char *repr = control_repr(control);
     if (repr != NULL) {
-        wprintw(win, repr);
+        wprintw(control->win, repr);
 
         // only allocated
         if (!control->edit || control->type == CONTROL_TYPE_TEXT) {
@@ -1108,6 +1122,19 @@ void control_draw(WINDOW *win, Control *control, int draw_time) {
     if (control->edit) {
         attroff(A_BOLD);
     }
+
+    wrefresh(control->win);
+}
+
+void control_update(Control *control, int time) {
+    if (control->focus && time - control->draw_time > CURSOR_BLINK_RATE_MSEC) {
+        control->draw_time = time;
+        control_refresh(control);
+    }
+}
+
+void control_draw(WINDOW *win, Control *control) {
+    control->win = win;
 }
 
 void control_focus(Control *control) {
@@ -1128,6 +1155,7 @@ void control_discard_edit(Control *control) {
         control_operator_discard_edit(&control->control_operator);
     }
 
+    control_refresh(control);
     control->edit = false;
 }
 
@@ -1135,8 +1163,9 @@ void control_focus_clear(Control *control) {
     control->focus = false;
     if (control->edit) {
         control_discard_edit(control);
+    } else {
+        control_refresh(control);
     }
-    control->edit = false;
 }
 
 bool control_edit(Control *control) {
@@ -1159,6 +1188,7 @@ bool control_edit(Control *control) {
 
     if (result) {
         control->edit = true;
+        control_refresh(control);
         return true;
     }
 
@@ -1176,6 +1206,8 @@ bool control_handle_step_input(Control *control, int i) {
         return control_operator_handle_step_input(&control->control_operator, i);
     }
 
+    control_refresh(control);
+
     return false;
 }
 
@@ -1183,6 +1215,8 @@ bool control_handle_multiplier_input(Control *control, double i) {
     if (control->type == CONTROL_TYPE_INT) {
         return control_int_handle_multiplier_input(&control->control_int, i);
     }
+
+    control_refresh(control);
 
     return false;
 }
@@ -1199,6 +1233,8 @@ InputResult control_handle_input(Control *control, char key) {
     } else if (control->type == CONTROL_TYPE_OPERATOR) {
         return control_operator_handle_input(&control->control_operator, key);
     }
+
+    control_refresh(control);
 
     return (InputResult){ .handled = false };
 }
@@ -1217,6 +1253,8 @@ bool control_empty(Control* control) {
     } else if (control->type == CONTROL_TYPE_NOTE) {
         return control_note_empty(&control->control_note);
     }
+
+    control_refresh(control);
 
     return false;
 }
@@ -1239,6 +1277,8 @@ void control_save_edit(Control *control) {
     if (updated && control->on_change != NULL) {
         control->on_change(control);
     }
+
+    control_refresh(control);
 }
 
 void control_free(Control *control) {
@@ -1253,4 +1293,6 @@ void control_free(Control *control) {
     }
 
     control->edit = false;
+
+    control_refresh(control);
 }

@@ -82,6 +82,8 @@ typedef struct
     int focused_at;
     void (*on_change)(void *); // self
     void *interface;
+    WINDOW *win;
+    int draw_time;
 } Control;
 
 Control control_init_bool(volatile bool *value, bool allow_empty,
@@ -106,7 +108,11 @@ Control control_init_operator(volatile Operator *value,
 
 char *control_repr(Control *control);
 
-void control_draw(WINDOW *win, Control *control, int draw_time);
+void control_refresh(Control *control);
+
+void control_update(Control *control, int time);
+
+void control_draw(WINDOW *win, Control *control);
 
 void control_focus(Control *control);
 

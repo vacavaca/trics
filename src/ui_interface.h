@@ -40,6 +40,10 @@ Interface *interface_init(State * const state);
 
 void interface_draw(WINDOW *win, Interface *interface, int draw_time);
 
+void interface_update(Interface *interface, int draw_time);
+
+void interface_refresh(WINDOW *win, Interface *interface);
+
 void interface_handle_input(Interface *interface, Input const *input);
 
 void interface_free(Interface *interface);

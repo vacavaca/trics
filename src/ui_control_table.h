@@ -25,6 +25,7 @@ typedef struct
     int focus_column;
     int offset;
     int highlight_row;
+    WINDOW *win;
 } ControlTable;
 
 ControlTable *control_table_init(int column_count, int x, int y,
@@ -35,7 +36,15 @@ bool control_table_add(ControlTable *table, Control const *row);
 
 bool control_table_set(ControlTable *table, int n, Control const *row);
 
+bool control_table_del(ControlTable *table, int n);
+
+void control_table_clear(ControlTable *table);
+
 void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time);
+
+void control_table_update(ControlTable const *table, int draw_time);
+
+void control_table_refresh(ControlTable const *table);
 
 void control_table_focus_first(ControlTable *table);
 

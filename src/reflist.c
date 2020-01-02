@@ -2,8 +2,11 @@
 
 
 RefList *ref_list_init(void) {
+    return ref_list_init_cap(DEFAULT_LIST_CAPACITY);
+}
+
+RefList *ref_list_init_cap(int cap) {
     const size_t item_size = sizeof(void *);
-    const size_t cap = DEFAULT_LIST_CAPACITY;
     void **array = malloc(cap * item_size);
     if (array == NULL) {
         return NULL;

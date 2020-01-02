@@ -5,7 +5,7 @@
 #include <stdbool.h> // bool
 #include <string.h> // memcpy
 
-#define DEFAULT_LIST_CAPACITY 64
+#define DEFAULT_LIST_CAPACITY 256
 
 typedef struct {
     size_t item_size;
@@ -15,6 +15,8 @@ typedef struct {
 } RefList;
 
 RefList *ref_list_init(void);
+
+RefList *ref_list_init_cap(int cap);
 
 bool ref_list_add(RefList *list, void *item);
 

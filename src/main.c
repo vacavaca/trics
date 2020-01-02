@@ -148,6 +148,8 @@ int main(int argc, char *argv[]) {
     curs_set(0);
     init_colors();
 
+    interface_draw(win, interface, 0);
+
     int t = 0;
     Input *inputs = NULL;
     while (true) {
@@ -168,8 +170,7 @@ int main(int argc, char *argv[]) {
 
         free_input(inputs);
         inputs = NULL;
-
-        interface_draw(win, interface, t * REFRESH_RATE_MSEC);
+        //interface_update(interface, 0);
         wrefresh(win);
         t += 1;
     }
