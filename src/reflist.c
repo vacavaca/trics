@@ -104,6 +104,35 @@ void *ref_list_get(RefList *list, int n) {
     return list->array[n];
 }
 
+int ref_list_bin_search(RefList *list, void *item,
+                         signed char (*cmp)(void *a, void *b)) {
+    if (list->length > 1) {
+        int min = 0;
+        int max = list->length - 1;
+
+        while (min <= max) {
+            int i = (min + max ) >> 1;
+            void *e = list->array[i];
+            signed char c = cmp(e, item);
+
+            if (c < 0) {
+                min = i + 1;
+            } else if (c > 0) {
+                max = i - 1;
+            } else {
+                return i;
+            }
+        }
+
+        return -(min + 1);
+    } else if (list->length == 1) {
+        signed char c = cmp(item, list->array[0]);
+        return c > 0 ? 1 : (c < 0 ? -1 : 0);
+    } else {
+        return -1;
+    }
+}
+
 void *ref_list_last(RefList *list) {
     return ref_list_get(list, 0);
 }

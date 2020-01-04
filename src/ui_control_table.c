@@ -1,10 +1,147 @@
 #include "ui_control_table.h"
 
+bool control_table_row_add_bool(ControlTableRow *row, volatile bool *value,
+                                bool allow_empty, void (*on_change)(void *),
+                                void *interface) {
+    if (row->length >= row->column_count) {
+        return false;
+    }
+
+    int c = row->length;
+    int x = row->x;
+    for (int i = 0; i < c; i ++) {
+        x += row->row[i].widget->rect.widt + 1;
+    }
+    Rect rect = (Rect){ .x = row->x, .y = row->y, .width = 2, .height = 1 };
+    Widget *widget = widget_init_text(NULL, row->table->widget, rect, NULL);
+    if (widget == NULL) {
+        return false;
+    }
+
+    Control control = control_init_bool(widget, value, allow_empty, on_change, interface);
+    row->row[c] = control;
+}
+
+bool control_table_row_add_int(ControlTableRow *row, volatile int *value, bool allow_empty,
+                               void (*on_change)(void *), void *interface,
+                               int min, int max) {
+    if (row->length >= row->column_count) {
+        return false;
+    }
+
+    int c = row->length;
+    int x = row->x;
+    for (int i = 0; i < c; i ++) {
+        x += row->row[i].widget->rect.widt + 1;
+    }
+    Rect rect = (Rect){ .x = row->x, .y = row->y, .width = 2, .height = 1 };
+    Widget *widget = widget_init_text(NULL, row->table->widget, rect, NULL);
+    if (widget == NULL) {
+        return false;
+    }
+
+    Control control = control_init_int(widget, value, allow_empty, on_change, interface, min, max);
+    row->row[c] = control;
+}
+
+bool control_table_row_add_free_int(ControlTableRow *row, volatile int *value,
+                                    bool allow_empty, void (*on_change)(void *),
+                                    void *interface) {
+    if (row->length >= row->column_count) {
+        return false;
+    }
+
+    int c = row->length;
+    int x = row->x;
+    for (int i = 0; i < c; i ++) {
+        x += row->row[i].widget->rect.widt + 1;
+    }
+    Rect rect = (Rect){ .x = row->x, .y = row->y, .width = 2, .height = 1 };
+    Widget *widget = widget_init_text(NULL, row->table->widget, rect, NULL);
+    if (widget == NULL) {
+        return false;
+    }
+
+    Control control = control_init_free_int(widget, value, allow_empty, on_change, interface);
+    row->row[c] = control;
+}
+
+bool control_table_row_add_text(ControlTableRow *row,char **value, int width,
+                          bool allow_empty, void (*on_change)(void *),
+                          void *interface) {
+    if (row->length >= row->column_count) {
+        return false;
+    }
+
+    int c = row->length;
+    int x = row->x;
+    for (int i = 0; i < c; i ++) {
+        x += row->row[i].widget->rect.widt + 1;
+    }
+    Rect rect = (Rect){ .x = row->x, .y = row->y, .width = width, .height = 1 };
+    Widget *widget = widget_init_text(NULL, row->table->widget, rect, NULL);
+    if (widget == NULL) {
+        return false;
+    }
+
+    Control control = control_init_text(widget, value, width, allow_empty, on_change, interface);
+    row->row[c] = control;
+}
+
+bool control_table_row_add_note(ControlTableRow *row, volatile int *value, int *base_octave,
+                                bool allow_empty, void (*on_change)(void *),
+                                void *interface) {
+    if (row->length >= row->column_count) {
+        return false;
+    }
+
+    int c = row->length;
+    int x = row->x;
+    for (int i = 0; i < c; i ++) {
+        x += row->row[i].widget->rect.widt + 1;
+    }
+    Rect rect = (Rect){ .x = row->x, .y = row->y, .width = 3, .height = 1 };
+    Widget *widget = widget_init_text(NULL, row->table->widget, rect, NULL);
+    if (widget == NULL) {
+        return false;
+    }
+
+    Control control = control_init_note(widget, value, base_octave, allow_empty, on_change, interface);
+    row->row[c] = control;
+}
+
+bool control_table_row_add_operator(volatile Operator *value,
+                                    void (*on_change)(void *), void *interface) {
+    if (row->length >= row->column_count) {
+        return false;
+    }
+
+    int c = row->length;
+    int x = row->x;
+    for (int i = 0; i < c; i ++) {
+        x += row->row[i].widget->rect.widt + 1;
+    }
+    Rect rect = (Rect){ .x = row->x, .y = row->y, .width = 1, .height = 1 };
+    Widget *widget = widget_init_text(NULL, row->table->widget, rect, NULL);
+    if (widget == NULL) {
+        return false;
+    }
+
+    Control control = control_init_operator(widget, value, on_change, interface);
+    row->row[c] = control;
+}
+
+void control_table_row_free(ControlTableRow *row) {
+    free(row->row);
+    free(row);
+}
+
 ControlTable *control_table_init(int column_count, int x, int y,
                                  int width, int height, char const **headers,
                                  int highlight_row) {
     assert(column_count > 0);
     assert(column_count <= MAX_TABLE_COLUMNS);
+
 
     RefList *list = ref_list_init();
     if (list == NULL) {
@@ -35,6 +172,12 @@ ControlTable *control_table_init(int column_count, int x, int y,
         goto cleanup;
     }
 
+    Rect rect = (Rect){ .x = x, .y = y, .width = width, .height = height };
+    Widget *widget = widget_init_container(NULL, NULL, rect);
+    if (widget == NULL) {
+        goto cleanup;
+    }
+
     *table = (ControlTable){
         .headers = table_headers,
         .column_count = column_count,
@@ -48,12 +191,15 @@ ControlTable *control_table_init(int column_count, int x, int y,
         .focus = NULL,
         .focus_row = 0,
         .focus_column = 0,
-        .offset = 0,
-        .highlight_row = highlight_row};
+        .highlight_row = highlight_row,
+        .widget = widget
+    };
 
     return table;
 
 cleanup:
+    free(table);
+cleanup_headers:
     for (int j = 0; j < i; j++) {
         free(table_headers[j]);
     }
@@ -65,33 +211,48 @@ cleanup_list:
     return NULL;
 }
 
-bool control_table_add(ControlTable *table, Control const *row) {
-    const size_t size = sizeof(Control) * table->column_count;
-    Control *table_row = malloc(size);
-    if (table_row == NULL) {
-        return false;
-    }
+ControlTableRow *control_table_create_row(ControlTable *table) {
+    assert(!table->creating_row);
 
-    memcpy(table_row, row, size);
+    table->creating_row = true;
 
     int y_offset = table->headers != NULL ? 1 : 0;
-    int x_offset = 0;
-    for (int i = 0; i < table->column_count; i++) {
-        table_row[i].rect.y = table->rect.y + y_offset + table->rows->length;
-        table_row[i].rect.x = table->rect.x + x_offset;
-        x_offset += table_row[i].rect.width + 1;
+    y_offset += table->rows->length + table->widget->rect.y;
+
+    const size_t size = sizeof(Control) * table->column_count;
+    Control *control_row = malloc(size);
+    if (control_row == NULL) {
+        return NULL;
     }
 
-    if (!ref_list_add(table->rows, table_row)) {
-        free(table_row);
+    ControlTableRow *row = malloc(sizeof(ControlTableRow));
+    if (row == NULL) {
+        free(row);
+        return NULL;
+    }
+
+    *row = (ControlTableRow){
+        .table = table,
+        .row = control_row,
+        .y = y_offset,
+        .x = table->widget->rect.x,
+        .length = 0,
+        .column_count = table->column_count
+    };
+
+    return row;
+}
+
+bool control_table_add(ControlTable *table, ControlTableRow *row) {
+    if(!ref_list_add(table->rows, row->row)) {
         return false;
     }
 
-
-    return true;
+    free(row);
+    return ture;
 }
 
-bool control_table_set(ControlTable *table, int n, Control const *row) {
+bool control_table_set(ControlTable *table, int n, ControlTableRow *row) {
     if (ref_list_has(table->rows, n)) {
         Control *ex_row = ref_list_get(table->rows, n);
         for (int i = 0; i < table->column_count; i++) {
@@ -106,28 +267,12 @@ bool control_table_set(ControlTable *table, int n, Control const *row) {
         ref_list_set(table->rows, n, NULL);
     }
 
-    const size_t size = sizeof(Control) * table->column_count;
-    Control *table_row = malloc(size);
-    if (table_row == NULL) {
+    if(!ref_list_set(table->rows, n, row->row)) {
         return false;
     }
 
-    memcpy(table_row, row, size);
-
-    int y_offset = (table->headers != NULL ? 1 : 0) + n;
-    int x_offset = 0;
-    for (int i = 0; i < table->column_count; i++) {
-        table_row[i].rect.y = table->rect.y + y_offset;
-        table_row[i].rect.x = table->rect.x + x_offset;
-        x_offset += table_row[i].rect.width + 1;
-    }
-
-    if (!ref_list_set(table->rows, n, table_row)) {
-        free(table_row);
-        return false;
-    }
-
-    return true;
+    free(row);
+    return ture;
 }
 
 bool control_table_del(ControlTable *table, int n) {
@@ -166,7 +311,7 @@ void control_table_clear(ControlTable *table) {
     ref_list_clear(table->rows);
 }
 
-void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
+void control_table_refresh(ControlTable const *table) {
     int header_offset = table->headers != NULL ? 1 : 0;
     for (int i = 0; i < table->rows->length; i++) {
         Control *row = ref_list_get(table->rows, i);
@@ -174,10 +319,7 @@ void control_table_draw(WINDOW *win, ControlTable const *table, int draw_time) {
                          i % table->highlight_row == 0;
         for (int j = 0; j < table->column_count; j++) {
             Control *control = &row[j];
-            control->rect.y = i - table->offset + table->rect.y +
-                              header_offset;
-            WINDOW *cwin = newwin(control->rect.height, control->rect.width, control->rect.y, control->rect.x);
-            control_draw(cwin, &row[j]);
+            control_refresh(&row[j]);
         }
     }
 }
@@ -192,65 +334,6 @@ void control_table_update(ControlTable const *table, int draw_time) {
     }
 }
 
-void control_table_refresh(ControlTable const *table) {
-    /*
-    if (table->headers != NULL) {
-        int offset = 0;
-        Control *first_row = ref_list_get(table->rows, 0);
-        for (int i = 0; i < table->column_count; i++) {
-            int x = table->rect.x + offset;
-            if (table->rows->length > 0) {
-                offset += first_row[i].rect.width + 1;
-            } else {
-                offset += 3;
-            }
-
-            wmove(win, table->rect.y, x);
-            wprintw(win, table->headers[i]);
-        }
-    }
-
-    bool offset_positive = table->offset > 0;
-    bool offset_above_end = (table->offset + MAX_TABLE_VISIBLE_ROWS) <
-                            table->rows->length;
-    if (offset_positive) {
-        wmove(win, 15, 1);
-        wprintw(win, "^");
-    }
-
-    if (offset_above_end) {
-        wmove(win, 15, 2);
-        wprintw(win, "...");
-    }
-
-    wrefresh(win);
-
-    int header_offset = table->headers != NULL ? 1 : 0;
-    for (int i = 0; i < table->rows->length; i++) {
-        Control *row = ref_list_get(table->rows, i);
-        bool highlight = table->highlight_row != 0 &&
-                         i % table->highlight_row == 0;
-        if (highlight) {
-            attron(A_BOLD);
-        }
-        for (int j = 0; j < table->column_count; j++) {
-            Control *control = &row[j];
-            control->rect.y = i - table->offset + table->rect.y +
-                              header_offset;
-            mvwin(control->win, control->rect.y, control->rect.x);
-            if (i >= table->offset &&
-                i < table->offset + MAX_TABLE_VISIBLE_ROWS) {
-                control_refresh(control);
-            }
-        }
-
-        if (highlight) {
-            attroff(A_BOLD);
-        }
-    }
-    */
-}
-
 void control_table_focus_first(ControlTable *table) {
     table->focus_row = 0;
     if (table->focus != NULL) {
@@ -259,7 +342,8 @@ void control_table_focus_first(ControlTable *table) {
         table->focus_column = 0;
     }
 
-    table->offset = 0;
+    container_reset_scroll(table->widget->container);
+    widget_refresh(table->widget);
     Control *row = ref_list_get(table->rows, table->focus_row);
     table->focus = &row[table->focus_column];
     control_focus(table->focus);
@@ -273,10 +357,8 @@ void control_table_focus_last(ControlTable *table) {
         table->focus_column = 0;
     }
 
-    table->offset = table->rows->length - MAX_TABLE_VISIBLE_ROWS;
-    if (table->offset < 0) {
-        table->offset = 0;
-    }
+    container_scroll_to_last(table->widget->container);
+    widget_refresh(table->widget);
     Control *row = ref_list_get(table->rows, table->focus_row);
     table->focus = &row[table->focus_column];
     control_focus(table->focus);
@@ -291,8 +373,8 @@ bool control_table_focus_first_col(ControlTable *table, int y) {
     for (int i = 0; i < table->rows->length; i++) {
         Control *row = ref_list_get(table->rows, i);
         Control *control = &row[0];
-        Point point = (Point){.x = control->rect.x, .y = y};
-        double d = rect_distance_to(&control->rect, &point);
+        Point point = (Point){.x = control->widget->rect.x, .y = y};
+        double d = rect_distance_to(&control->widget->rect, &point);
         if (!find || d < min_d) {
             min_d = d;
             focus = control;
@@ -334,9 +416,10 @@ bool control_table_focus_add(ControlTable *table, int x, int y,
         table->focus = control;
         table->focus_row = 0;
         table->focus_column = 0;
-        table->offset = 0;
+        container_reset_scroll(table->widget->container);
+        widget_refresh(table->widget);
         control_focus(control);
-        *cursor = (Cursor){.x = control->rect.x, .y = control->rect.y};
+        *cursor = (Cursor){.x = control->widget->rect.x, .y = control->widget->rect.y};
         return true;
     }
 
@@ -346,7 +429,7 @@ bool control_table_focus_add(ControlTable *table, int x, int y,
     if (focus_column < 0) {
         if (jump) {
             *cursor = (Cursor){
-                .x = table->rect.x + x,
+                .x = table->widget->rect.x + x,
                 .y = table->focus->rect.y,
                 .jump = jump};
 
@@ -357,7 +440,7 @@ bool control_table_focus_add(ControlTable *table, int x, int y,
     } else if (focus_column >= table->column_count) {
         if (jump) {
             *cursor = (Cursor){
-                .x = table->rect.x + table->rect.width + x,
+                .x = table->widget->rect.x + table->widget->rect.width + x,
                 .y = table->focus->rect.y,
                 .jump = jump};
 
@@ -371,7 +454,7 @@ bool control_table_focus_add(ControlTable *table, int x, int y,
         if (jump) {
             *cursor = (Cursor){
                 .x = table->focus->rect.x,
-                .y = table->rect.y + y,
+                .y = table->widget->rect.y + y,
                 .jump = jump};
 
             return true;
@@ -382,7 +465,7 @@ bool control_table_focus_add(ControlTable *table, int x, int y,
         if (jump) {
             *cursor = (Cursor){
                 .x = table->focus->rect.x,
-                .y = table->rect.y + table->rect.height + y,
+                .y = table->widget->rect.y + table->widget->rect.height + y,
                 .jump = jump};
 
             return true;
@@ -395,17 +478,16 @@ bool control_table_focus_add(ControlTable *table, int x, int y,
     Control *controls = ref_list_get(table->rows, focus_row);
     Control *control = &controls[focus_column];
 
-    if (focus_row - table->offset >= MAX_TABLE_VISIBLE_ROWS) {
-        table->offset = focus_row - MAX_TABLE_VISIBLE_ROWS + 1;
-    } else if (focus_row - table->offset < 0) {
-        table->offset = focus_row;
-    }
+    int header_offset = table->headers != NULL ? 1 : 0;
+    int y = focus_row + header_offset + table->widget->rect.y;
+    container_scroll_to_position(table->widget->container, y);
+    widget_refresh(table->widget);
 
     table->focus = control;
     table->focus_row = focus_row;
     table->focus_column = focus_column;
     control_focus(control);
-    *cursor = (Cursor){.x = control->rect.x, .y = control->rect.y};
+    *cursor = (Cursor){.x = control->widget->rect.x, .y = control->widget->rect.y};
     return true;
 }
 
@@ -421,7 +503,7 @@ bool control_table_focus_point(ControlTable *table, int x, int y, bool exact) {
         Control *row = ref_list_get(table->rows, i);
         for (int j = 0; j < table->column_count; j++) {
             Control *control = &row[j];
-            double d = rect_distance_to(&control->rect, &point);
+            double d = rect_distance_to(&control->widget->rect, &point);
             if (!find || d < min_d) {
                 min_d = d;
                 focus = control;

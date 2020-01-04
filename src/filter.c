@@ -15,7 +15,7 @@ LadderFilter *filter_init(int sample_rate) {
         filter->d[i] = 0;
     }
 
-    filter_set_cutoff(filter, 1000.0);
+    filter_set_cutoff(filter, 20000.0);
 
     return filter;
 }
@@ -23,7 +23,8 @@ LadderFilter *filter_init(int sample_rate) {
 // 0 - 1
 void filter_set_resonance(LadderFilter *filter, float r) {
     if (abs(filter->resonance - r) >= 0.005) {
-        filter->r = 0.8 * r * (filter->t2 + 6.0 * filter->t1) / (filter->t2 - 6.0 * filter->t1);
+        filter->r = 0.8 * r * (filter->t2 + 6.0 * filter->t1) /
+                    (filter->t2 - 6.0 * filter->t1);
         filter->resonance = r;
     }
 }
@@ -44,10 +45,14 @@ void filter_set_cutoff(LadderFilter *filter, float f) {
 float filter_process(LadderFilter *filter, float s) {
     float x = s - MIN(1.0, filter->cutoff / 2000) * filter->r * filter->s[3];
 
-    filter->s[0] = x * filter->p + filter->d[0]  * filter->p - filter->k * filter->s[0];
-    filter->s[1] = filter->s[0] * filter->p + filter->d[1] * filter->p - filter->k * filter->s[1];
-    filter->s[2] = filter->s[1] * filter->p + filter->d[2] * filter->p - filter->k * filter->s[2];
-    filter->s[3] = filter->s[2] * filter->p + filter->d[3] * filter->p - filter->k * filter->s[3];
+    filter->s[0] = x * filter->p + filter->d[0]  * filter->p -
+                   filter->k * filter->s[0];
+    filter->s[1] = filter->s[0] * filter->p + filter->d[1] * filter->p -
+                   filter->k * filter->s[1];
+    filter->s[2] = filter->s[1] * filter->p + filter->d[2] * filter->p -
+                   filter->k * filter->s[2];
+    filter->s[3] = filter->s[2] * filter->p + filter->d[3] * filter->p -
+                   filter->k * filter->s[3];
 
     filter->s[3] -= (filter->s[3] * filter->s[3] * filter->s[3]) / 6.0;
 

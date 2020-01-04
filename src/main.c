@@ -2,6 +2,7 @@
 #include "state.h"
 #include "ui_interface.h"
 #include "audio.h"
+#include "render.h"
 #include <ncurses.h> // ncurses functions
 #include <signal.h>  // signal
 #include <stdbool.h>  // bool
@@ -43,7 +44,8 @@ void handle_resize(int sig) {
 
 void handle_exit(void) {
     disable_raw_mode();
-    endwin();
+    renderer_teardown();
+    //endwin();
     disable_mouse_tracking();
 }
 
@@ -56,6 +58,31 @@ void sleep_msec(int ms) {
 }
 
 int main(int argc, char *argv[]) {
+    renderer_setup();
+    Widget *table = widget_init_container(NULL, NULL, (Rect){ .x = 1, .y = 5, .width = 10, .height = 10 });
+
+    for (int i = 0; i < 40; i += 2) {
+        char *str = malloc(10);
+        sprintf(str, "test %d\0", i);
+        widget_init_text(NULL, table, (Rect){ .x = 1, .y = i, .width = 10, .height = 1 }, str);
+    }
+
+    widget_refresh(table);
+
+    int i = 0;
+    while (i < 100) {
+        i += 1;
+
+        container_scroll(table->container, 1);
+        widget_refresh(table);
+
+        SDL_Delay(300.0);
+    }
+
+    renderer_teardown();
+
+
+    return 0;
     State *state = state_init((char *)"Song Title");
     if (state == NULL) {
         fprintf(stderr, "Failed to initialize state\n");

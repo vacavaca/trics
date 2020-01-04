@@ -3,9 +3,9 @@
 
 #include "state.h" // EMPTY
 #include "ui_base.h" // InputResult
+#include "render.h" // Wifget, Color
 #include "util.h" // Rect
 #include <stdbool.h> // bool
-#include <ncurses.h> // ncurses
 #include <stdlib.h> // malloc
 #include <string.h> // memcpy
 #include <errno.h> // errno
@@ -76,34 +76,36 @@ typedef struct
         ControlNote control_note;
         ControlOperator control_operator;
     };
-    Rect rect;
     bool focus;
     bool edit;
     int focused_at;
     void (*on_change)(void *); // self
     void *interface;
-    WINDOW *win;
+    Widget *widget;
     int draw_time;
 } Control;
 
-Control control_init_bool(volatile bool *value, bool allow_empty,
-                          void (*on_change)(void *), void *interface);
-
-Control control_init_int(volatile int *value, bool allow_empty,
-                         void (*on_change)(void *), void *interface,
-                         int min, int max);
-
-Control control_init_free_int(volatile int *value, bool allow_empty,
-                              void (*on_change)(void *), void *interface);
-
-Control control_init_text(char **value, int width, bool allow_empty,
-                          void (*on_change)(void *), void *interface);
-
-Control control_init_note(volatile int *value, int *base_octave,
+Control control_init_bool(Widget *widget, volatile bool *value,
                           bool allow_empty, void (*on_change)(void *),
                           void *interface);
 
-Control control_init_operator(volatile Operator *value,
+Control control_init_int(Widget *widget, volatile int *value, bool allow_empty,
+                         void (*on_change)(void *), void *interface,
+                         int min, int max);
+
+Control control_init_free_int(Widget *widget, volatile int *value,
+                              bool allow_empty, void (*on_change)(void *),
+                              void *interface);
+
+Control control_init_text(Widget *widget, char **value, int width,
+                          bool allow_empty, void (*on_change)(void *),
+                          void *interface);
+
+Control control_init_note(Widget *widget, volatile int *value, int *base_octave,
+                          bool allow_empty, void (*on_change)(void *),
+                          void *interface);
+
+Control control_init_operator(Widget *widget, volatile Operator *value,
                               void (*on_change)(void *), void *interface);
 
 char *control_repr(Control *control);
@@ -111,8 +113,6 @@ char *control_repr(Control *control);
 void control_refresh(Control *control);
 
 void control_update(Control *control, int time);
-
-void control_draw(WINDOW *win, Control *control);
 
 void control_focus(Control *control);
 

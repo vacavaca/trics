@@ -3,7 +3,6 @@
 
 #include "ui_control_table.h" // ControlTable
 #include "reflist.h" // RefList
-#include <ncurses.h> // wmove wprintw
 #include <stdbool.h> // bool
 #include <stdlib.h>  // malloc
 #include "state.h"   // Song, State
@@ -18,7 +17,9 @@ Layout *layout_init(State *const state);
 
 bool layout_add_table(Layout *layout, ControlTable *table);
 
-void layout_draw(WINDOW *win, Layout const *layout, int draw_time);
+void layout_refresh(Layout *layout);
+
+void layout_update(Layout *layout, int draw_time);
 
 void layout_focus_clear(Layout *layout);
 

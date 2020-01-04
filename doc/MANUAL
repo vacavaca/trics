@@ -134,25 +134,30 @@ Song arrangement tab
  | *SONG  PATT  INST  ARP    | <---- Tabs
  |                           |
  |  bp st title              | <---- Main song parameters:
- |  80 10 Song Title lol...  |         bp - BPM (tempo)
+ |  80 10 Song Title         |         bp - BPM (tempo)
  |                           |         st - Steps, number of steps in a pattern
- |  00 -- 03 01 -- 03 ff r4  | --      title - Song title
- |  00 -- 03 01 -- 03 ff r4  |  |
- |  00 -- 03 01 -- 03 ff r4  |  |
- |  00 -- 03 01 -- 03 ff r4  |  |--- Pattern arrangement table
- |  00 -- 03 01 -- 03 ff r4  |  |    enter pattern numbers here
- |  00 -- 03 01 -- 03 ff r4  |  |    to arrange your song
+ |  00 -- 03 01 -- 03 ff a4  | --      title - Song title
+ |  00 -- 03 01 -- 03 ff a4  |  |
+ |  00 -- 03 01 -- 03 ff a4  |  |
+ |  00 -- 03 01 -- 03 ff a4  |  |--- Pattern arrangement table
+ |  00 -- 03 01 -- 03 ff a4  |  |    enter pattern numbers here
+ |  00 -- 03 01 -- 03 ff a4  |  |    to arrange your song
  |  01 43 -- -- -- -- -- --  |  |
  |> 01 43 -- -- -- -- -- --  | --
  |                           |
- |  ...            CTRL + h  | <---- Shows pressed keys and mouse events
+ |  ^...         CTRL + h 80 | <---- Shows the value of the edited parameter
  |__________________________ |
 
- ">" Shows currently played bar
+                     |
+                     --------------- Shows pressed keys and mouse events
 
- "..." Indicates that there are more table rows hidden bellow or above.
+ ">" Shows the bar that is currently playing
+
+ "^..." Indicates that there are more table rows hidden bellow or above.
 
 Pattern tab
+
+One pattern represents one bar of the song, it can contain 4 through 32 steps, each step represets 1/4 or 1/8 ... or 1/32 note length accroding to step setting of the song.
 
 Instrument tab
 

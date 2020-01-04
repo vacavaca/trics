@@ -966,85 +966,84 @@ bool control_operator_discard_edit(ControlOperator *control) {
 
 // Control
 
-Control control_init_bool(volatile bool *value, bool allow_empty,
-                          void (*on_change)(void *), void *interface) {
+Control control_init_bool(Widget *widget, volatile bool *value,
+                          bool allow_empty, void (*on_change)(void *),
+                          void *interface) {
     return (Control){
         .type = CONTROL_TYPE_BOOL,
         .control_bool = control_bool_init(value),
-        .rect = (Rect){ .x=0, .y=0, .width=2, .height=1 },
         .focus = false,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
         .interface = interface,
-        .win = NULL,
+        .widget = widget,
         .draw_time = 0};
 }
 
-Control control_init_int(volatile int *value, bool allow_empty,
+Control control_init_int(Widget *widget, volatile int *value, bool allow_empty,
                          void (*on_change)(void *), void *interface,
                          int min, int max) {
     return (Control){
         .type = CONTROL_TYPE_INT,
         .control_int = control_int_init(value, allow_empty, min, max),
-        .rect = (Rect){ .x=0, .y=0, .width=2, .height=1 },
         .focus = false,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
         .interface = interface,
-        .win = NULL,
+        .widget = widget,
         .draw_time = 0};
 }
 
-Control control_init_free_int(volatile int *value, bool allow_empty,
-                              void (*on_change)(void *), void *interface) {
-    return control_init_int(value, allow_empty, on_change, interface, MIN_PARAM, MAX_PARAM);
+Control control_init_free_int(Widget *widget, volatile int *value,
+                              bool allow_empty, void (*on_change)(void *),
+                              void *interface) {
+    return control_init_int(widget, value, allow_empty, on_change, interface,
+                            MIN_PARAM, MAX_PARAM);
 }
 
-Control control_init_text(char **value, int width, bool allow_empty,
-                          void (*on_change)(void *), void *interface) {
+Control control_init_text(Widget *widget, char **value, int width,
+                          bool allow_empty, void (*on_change)(void *),
+                          void *interface) {
     return (Control){
         .type = CONTROL_TYPE_TEXT,
         .control_text = control_text_init(value, allow_empty, width),
-        .rect = (Rect){ .x=0, .y=0, .width=width, .height=1 },
         .focus = false,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
         .interface = interface,
-        .win = NULL,
+        .widget = widget,
         .draw_time = 0};
 }
 
-Control control_init_note(volatile int *value, int *base_octave,
+Control control_init_note(Widget *widget, volatile int *value, int *base_octave,
                           bool allow_empty, void (*on_change)(void *),
                           void *interface) {
     return (Control){
         .type = CONTROL_TYPE_NOTE,
         .control_note = control_note_init(value, base_octave, allow_empty),
-        .rect = (Rect){ .x=0, .y=0, .width=3, .height=1 },
         .focus = false,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
         .interface = interface,
-        .win = NULL,
+        .widget = widget,
         .draw_time = 0};
 }
 
-Control control_init_operator(volatile Operator *value,
+Control control_init_operator(Widget *widget, volatile Operator *value,
                               void (*on_change)(void *), void *interface) {
     return (Control){
         .type = CONTROL_TYPE_OPERATOR,
         .control_operator = control_operator_init(value),
-        .rect = (Rect){ .x=0, .y=0, .width=1, .height=1 },
         .focus = false,
         .edit = false,
         .focused_at = -1,
         .on_change = on_change,
         .interface = interface,
-        .win = NULL,
+        .widget = widget,
         .draw_time = 0};
 }
 
@@ -1079,10 +1078,6 @@ char *control_repr(Control *control) {
 
 
 void control_refresh(Control *control) {
-    if (control->win == NULL) {
-        return;
-    }
-
     int color;
     if (control->focus || control->edit) {
         if (control->focused_at == -1) {
@@ -1103,27 +1098,19 @@ void control_refresh(Control *control) {
         color = UI_COLOR_BRIGHT;
     }
 
-    if (control->edit) {
-        attron(A_BOLD);
-    }
-    attron(COLOR_PAIR(color));
+    control->widget->text.color = color;
+    control->widget->text.bold = control->edit;
 
     char *repr = control_repr(control);
     if (repr != NULL) {
-        wprintw(control->win, repr);
+        control->widget->text.text = repr;
+        widget_refresh(control->widget);
 
         // only allocated
         if (!control->edit || control->type == CONTROL_TYPE_TEXT) {
             free(repr);
         }
     }
-
-    attroff(COLOR_PAIR(color));
-    if (control->edit) {
-        attroff(A_BOLD);
-    }
-
-    wrefresh(control->win);
 }
 
 void control_update(Control *control, int time) {
@@ -1133,13 +1120,10 @@ void control_update(Control *control, int time) {
     }
 }
 
-void control_draw(WINDOW *win, Control *control) {
-    control->win = win;
-}
-
 void control_focus(Control *control) {
     control->focus = true;
     control->focused_at = -1;
+    control_refresh(control);
 }
 
 void control_discard_edit(Control *control) {
@@ -1155,8 +1139,8 @@ void control_discard_edit(Control *control) {
         control_operator_discard_edit(&control->control_operator);
     }
 
-    control_refresh(control);
     control->edit = false;
+    control_refresh(control);
 }
 
 void control_focus_clear(Control *control) {

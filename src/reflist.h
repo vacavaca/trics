@@ -26,6 +26,9 @@ bool ref_list_insert(RefList *list, int n, void *item);
 
 bool ref_list_has(RefList *list, int n);
 
+int ref_list_bin_search(RefList *list, void *item,
+                         signed char (*cmp)(void *a, void *b));
+
 void *ref_list_get(RefList *list, int n);
 
 void *ref_list_last(RefList *list);

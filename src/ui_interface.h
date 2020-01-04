@@ -5,7 +5,6 @@
 #include "ui_control.h" // Control
 #include "ui_layout.h"  // Layout
 #include "input.h"      // Input
-#include <ncurses.h>    // ncurses
 #include <stdlib.h>       // malloc, free
 
 #define MAX_TEXT_WIDTH 24
@@ -34,15 +33,17 @@ typedef struct
     int input_repr_printed_at;
     Layout *focus;
     Control *focus_control;
+    Widget *tab_widget;
+    Widget *sub_tab_widget;
+    Widget *input_repr_widget;
+    Widget *edit_widget;
 } Interface;
 
 Interface *interface_init(State * const state);
 
-void interface_draw(WINDOW *win, Interface *interface, int draw_time);
-
 void interface_update(Interface *interface, int draw_time);
 
-void interface_refresh(WINDOW *win, Interface *interface);
+void interface_refresh(Interface *interface);
 
 void interface_handle_input(Interface *interface, Input const *input);
 

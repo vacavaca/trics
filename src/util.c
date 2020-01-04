@@ -14,6 +14,21 @@ bool rect_contains(Rect const *rect, Point const *point) {
            point->y >= rect->y && point->y - rect->y <= rect->height;
 }
 
+bool rect_contains_rect(Rect const *rect, Rect const *other) {
+    Point a = (Point){ .x = other->x, .y = other->y };
+    Point b = (Point){ .x = a.x + other->width, .y = a.y };
+    Point c = (Point){ .x = b.x, .y = a.y + other->height };
+    Point d = (Point){ .x = a.x, .y = c.y };
+
+    return rect_contains(rect, &a) && rect_contains(rect, &b) &&
+           rect_contains(rect, &c) && rect_contains(rect, &d);
+}
+
+bool rect_eq(Rect const *rect, Rect const *other) {
+    return rect->x == other->x && rect->y == other->y &&
+           rect->width == other->width && rect->height == other->height;
+}
+
 Point orthogonal(Point const *point) {
     return (Point){
         .x = point->y,

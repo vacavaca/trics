@@ -25,13 +25,25 @@ void layout_draw(WINDOW *win, Layout const *layout, int draw_time) {
     }
 }
 
+void layout_refresh(Layout *layout) {
+    for (int i = 0; i < layout->tables->length; i++) {
+        control_table_refresh(ref_list_get(layout->tables, i));
+    }
+}
+
+void layout_update(Layout *layout, int draw_time) {
+    for (int i = 0; i < layout->tables->length; i++) {
+        control_table_update(ref_list_get(layout->tables, i), draw_time);
+    }
+}
+
 void layout_focus_clear(Layout *layout) {
     ControlTable *table = layout->focus;
+    layout->focus = NULL;
+
     if (table != NULL) {
         control_table_focus_clear(table);
     }
-
-    layout->focus = NULL;
 }
 
 void layout_focus_first(Layout *layout) {
@@ -43,17 +55,17 @@ void layout_focus_first(Layout *layout) {
 
         for (int i = 0; i < layout->tables->length; i++) {
             ControlTable *table = ref_list_get(layout->tables, i);
-            if (!find || table->rect.x < min_x || table->rect.y < min_y) {
-                min_x = table->rect.x;
-                min_y = table->rect.y;
+            if (!find || table->widget->rect.x < min_x || table->widget->rect.y < min_y) {
+                min_x = table->widget->rect.x;
+                min_y = table->widget->rect.y;
                 focus = table;
                 find = true;
             }
         }
     }
 
-    control_table_focus_first(focus);
     layout->focus = focus;
+    control_table_focus_first(focus);
 }
 
 void layout_focus_last(Layout *layout) {
@@ -65,25 +77,25 @@ void layout_focus_last(Layout *layout) {
 
         for (int i = 0; i < layout->tables->length; i++) {
             ControlTable *table = ref_list_get(layout->tables, i);
-            if (!find || table->rect.x < min_x || table->rect.y < min_y) {
-                min_x = table->rect.x;
-                min_y = table->rect.y;
+            if (!find || table->widget->rect.x < min_x || table->widget->rect.y < min_y) {
+                min_x = table->widget->rect.x;
+                min_y = table->widget->rect.y;
                 focus = table;
                 find = true;
             }
         }
     }
 
-    control_table_focus_last(focus);
     layout->focus = focus;
+    control_table_focus_last(focus);
 }
 
 void layout_focux_first_col_or_same(Layout *layout, int x, int y) {
     ControlTable *focus = NULL;
     for (int i = 0; i < layout->tables->length; i++) {
         ControlTable *table = ref_list_get(layout->tables, i);
-        if (x >= table->rect.x && x <= table->rect.x + table->rect.width &&
-            y >= table->rect.y && y <= table->rect.y + table->rect.height) {
+        if (x >= table->widget->rect.x && x <= table->widget->rect.x + table->widget->rect.width &&
+            y >= table->widget->rect.y && y <= table->widget->rect.y + table->widget->rect.height) {
             focus = table;
             break;
         }
@@ -106,7 +118,7 @@ void layout_focus_point(Layout *layout, int x, int y, bool exact) {
     Point point = (Point){ .x = x, .y = y };
     for (int i = 0; i < layout->tables->length; i++) {
         ControlTable *table = ref_list_get(layout->tables, i);
-        if (rect_contains(&table->rect, &point)) {
+        if (rect_contains(&table->widget->rect, &point)) {
             focus = table;
             break;
         }
@@ -132,9 +144,9 @@ void layout_focus_add(Layout *layout, int x, int y, bool jump) {
 
         for (int i = 0; i < layout->tables->length; i++) {
             ControlTable *table = ref_list_get(layout->tables, i);
-            if (!find || table->rect.x < min_x || table->rect.y < min_y) {
-                min_x = table->rect.x;
-                min_y = table->rect.y;
+            if (!find || table->widget->rect.x < min_x || table->widget->rect.y < min_y) {
+                min_x = table->widget->rect.x;
+                min_y = table->widget->rect.y;
                 focus = table;
                 find = true;
             }
@@ -159,7 +171,7 @@ void layout_focus_add(Layout *layout, int x, int y, bool jump) {
             for (int i = 0; i < layout->tables->length; i++) {
                 ControlTable *table = ref_list_get(layout->tables, i);
                 if (table == layout->focus ||
-                    !rect_ray_intersection(&table->rect, &origin,
+                    !rect_ray_intersection(&table->widget->rect, &origin,
                                            &ray, &inter)) {
                     continue;
                 }

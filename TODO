@@ -1,17 +1,17 @@
-* MAX/MIN for controls
-* optimize refresh 4h
+* optimize refresh
   * only on input or bar
   * refresh only restricted area
 * update state.c initializers
-* playing ?
+* playing
 * other tab layouts 2h
 * copy/paste 3h
-* min/max for controls, ckeck state constraints
+* args
+* saving/loading
+* remove or refactor -pg from MAKEFILE
+
+* linter
+* general refactoring
+* export
 * recording ?
 * delay ?
 * reverb ?
-* linter
-* args
-* saving/loading
-* export
-* remove or refactor -pg from MAKEFILE

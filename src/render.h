@@ -2,7 +2,9 @@
 #define RENDER_H
 
 #include "util.h" // Rect
+#include "reflist.h" // RefList
 #include <stdbool.h> // bool
+#include <assert.h> // assert
 
 typedef enum {
     UI_COLOR_BLUE = 1,
@@ -21,21 +23,39 @@ typedef enum {
 
 typedef struct {
     char *text;
-    Color fg;
-    Color bg;
+    Color color;
     bool bold;
-    Rect rect;
 } Text;
+
+
+typedef struct Widget Widget;
 
 // Container
 
 typedef struct {
     int scroll;
-    Rect rect;
+    int rscroll;
     RefList *children;
+    bool rendered;
 } Container;
 
-Container *container_init(Rect rect);
+Container *container_init(void);
+
+bool container_add(Container *container, Widget *widget);
+
+void container_remove(Widget *widget);
+
+void container_reset_scroll(Container *container);
+
+void container_scroll(Container *container, int n);
+
+void container_scroll_to_last(Container *container);
+
+void container_scroll_to_position(Container *container, int y);
+
+void container_move(Container *container, int x, int y);
+
+void container_refresh(Container *container, Rect const *rect);
 
 void container_free(Container *container);
 
@@ -47,21 +67,25 @@ void container_free(Container *container);
 
 typedef struct Renderer Renderer;
 
-Renderer *renderer_init(Rect rect, ...);
+typedef struct RendererParams RendererParams;
+
+void renderer_setup(void);
+
+void renderer_winch(void);
+
+Renderer *renderer_init(RendererParams *params, Rect rect);
 
 void renderer_clear(Renderer *renderer);
 
-void renderer_move(Renderer *renderer, Point position);
+void renderer_move(Renderer *renderer, int x, int y);
 
 void renderer_render(Renderer *renderer, Text *text);
 
-int renderer_get_updated_at(Renderer *renderer);
-
 void renderer_free(Renderer *renderer);
 
-// Widget
+void renderer_teardown(void);
 
-typedef struct Widget Widget;
+// Widget
 
 typedef enum {
     WIDGET_TYPE_TEXT,
@@ -72,15 +96,23 @@ struct Widget {
     Renderer *renderer;
     Widget *parent;
     WidgetType type;
+    Rect rect;
     union {
         Text text;
-        Container container;
+        Container *container;
     };
-}
+    int refreshed_at;
+};
 
-Widget *widget_init_text(Widget *parent, Point position, char *text);
+Widget *widget_init_text(RendererParams *params, Widget *parent,
+                         Rect rect, char *txt);
 
-Widget *widget_init_container(Widget *parent, Rect rect);
+Widget *widget_init_container(RendererParams *params, Widget *parent,
+                              Rect rect);
+
+void widget_move(Widget *widget, int x, int y);
+
+void widget_clear(Widget *widget);
 
 void widget_refresh(Widget *widget);
 

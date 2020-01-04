@@ -9,6 +9,11 @@
 #define CLAMP(a, n, x) MIN(MAX(a, n), x)
 #define NORM(a, n, x) ((CLAMP((float)a, n, x) - n) / (x - n))
 
+// error handling
+#define CHECK_N(e, l) if (e == NULL) { goto l; }
+#define CHECK(e, l) if (!e) { goto l; }
+#define FREE_N(f, e) if (e != NULL) { f(e); }
+
 #define PI 3.14159265359
 
 int sign(int a);
@@ -26,6 +31,10 @@ typedef struct {
 } Rect;
 
 bool rect_contains(Rect const *rect, Point const *point);
+
+bool rect_contains_rect(Rect const *rect, Rect const *other);
+
+bool rect_eq(Rect const *rect, Rect const *other);
 
 double length(Point const *point);
 

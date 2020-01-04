@@ -3,92 +3,110 @@
 #include <ncurses.h>
 
 struct Renderer {
-    Renderer *parent;
     Rect rect;
-    RefList *children;
-    int updated_at;
+    Rect wrect;
+    bool rendered;
     WINDOW *win;
 };
 
-Renderer *renderer_init(Renderer *parent, Rect rect, ...) {
+void renderer_setup(void) {
+    initscr();
+    curs_set(0);
+
+    start_color();
+    init_pair(UI_COLOR_BLUE, COLOR_BLUE, COLOR_BLACK);
+    init_pair(UI_COLOR_GREEN, COLOR_GREEN, COLOR_BLACK);
+    init_pair(UI_COLOR_CYAN, COLOR_CYAN, COLOR_BLACK);
+    init_pair(UI_COLOR_RED, COLOR_RED, COLOR_BLACK);
+    init_pair(UI_COLOR_MAGENTA, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(UI_COLOR_YELLOW, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(UI_COLOR_WHITE, COLOR_WHITE, COLOR_BLACK);
+    init_pair(UI_COLOR_GREY, 8, COLOR_BLACK);
+    init_pair(UI_COLOR_BRIGHT, 15, COLOR_BLACK);
+    init_pair(UI_COLOR_INVERSE, 16, COLOR_WHITE);
+}
+
+void renderer_winch(void) {
+    /*
+    endwin();
+    wclear(win);
+    winsertln(win);
+    */
+}
+
+Renderer *renderer_init(RendererParams *params, Rect rect) {
     WINDOW *win = newwin(rect.height, rect.width, rect.y, rect.x);
     if (win == NULL) {
-        goto cleanup_ap;
-    }
-
-    RefList *children = ref_list_init();
-    if (children == NULL) {
-        goto cleanup_win;
+        return NULL;
     }
 
     Renderer *renderer = malloc(sizeof(Renderer));
     if (renderer == NULL) {
-        goto cleanup_children;
-    }
-
-    *renderer = (Renderer){
-        .parent = parent,
-        .rect = rect,
-        .children = children,
-        .updated_at = -1,
-        .win = win
-    };
-
-    if (parent != NULL && !ref_list_add(parent->children, renderer)) {
         goto cleanup;
     }
 
-    va_end(ap);
+    *renderer = (Renderer){
+        .rect = rect,
+        .wrect = rect,
+        .rendered = false,
+        .win = win
+    };
+
     return renderer;
 
 cleanup:
-    free(renderer);
-cleanup_children:
-    ref_list_free(children);
-cleanup_win:
     delwin(win);
-cleanup_ap:
-    va_end(ap);
     return NULL;
 }
 
 void renderer_clear(Renderer *renderer) {
     wclear(renderer->win);
-}
-
-void renderer_print(Renderer *renderer, char *str) {
-    wprintw(renderer->win, str);
-}
-
-void renderer_scroll(Renderer *renderer, int n) {
-
-}
-
-void renderer_refresh(Renderer *renderer, int time) {
-    renderer->updated_at = time;
     wrefresh(renderer->win);
 }
 
-int renderer_get_updated_at(Renderer *renderer) {
-    return renderer->updated_at;
+void renderer_move(Renderer *renderer, int x, int y) {
+    renderer->rect.x = x;
+    renderer->rect.y = y;
 }
 
-void renderer_free(Renderer *renderer) {
-    if (renderer->parent != NULL) {
-        Renderer *parent = renderer->parent;
-        for (int i = 0; i < parent->children->length; i ++) {
-            if (ref_list_get(parent->children, i) == renderer) {
-                ref_list_del(parent->children, i);
-                break;
-            }
+void renderer_render(Renderer *renderer, Text *text) {
+    if (!renderer->rendered || !rect_eq(&renderer->rect, &renderer->wrect)) {
+        mvwin(renderer->win, renderer->rect.y, renderer->rect.x);
+        renderer->wrect = renderer->rect;
+    }
+
+    if (renderer->rendered) {
+        wclear(renderer->win);
+    }
+
+
+    if (text->text != NULL) {
+        if (text->bold) {
+            attron(A_BOLD);
+        }
+
+        attron(COLOR_PAIR(text->color));
+
+        wprintw(renderer->win, text->text);
+
+        attroff(COLOR_PAIR(text->color));
+
+        if (text->bold) {
+            attroff(A_BOLD);
         }
     }
 
-    for (int i = 0; i < renderer->children->length; i ++) {
-        renderer_free(ref_list_get(renderer->children, i);
-    }
+    wrefresh(renderer->win);
 
-    ref_list_free(renderer->children);
+    renderer->rendered = true;
+}
+
+void renderer_free(Renderer *renderer) {
     delwin(renderer->win);
     free(renderer);
 }
+
+void renderer_teardown(void) {
+    endwin();
+}
+
